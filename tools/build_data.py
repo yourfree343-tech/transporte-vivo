@@ -41,7 +41,7 @@ def slug_from(url):
     m = re.search(r"/moveuskadi/([^/]+)/", url)
     return m.group(1).lower() if m else None
 
-def discover_euskadi(existing_urls):
+def discover_euskadi(existing_urls, base_feeds):
     found = []
     try:
         rt = walk_urls(json.loads(get("https://opendata.euskadi.eus/transport/moveuskadi/data-index-gtfs-rt.json", 60)), [])
@@ -56,14 +56,27 @@ def discover_euskadi(existing_urls):
         if u.lower().endswith(".zip") and "gtfs" in u.lower():
             s = slug_from(u)
             if s and s not in zips: zips[s] = u
+    norm = lambda x: re.sub(r"[^a-z0-9]", "", x.lower())
+    base_by = {norm(f["id"]): f for f in base_feeds}
+    seen = {}
     for i, u in enumerate(sorted(set(rt))):
         low = u.lower()
         if not low.endswith(".pb") or "vehicle" not in low or u in existing_urls: continue
         s = slug_from(u) or f"euskadi{i}"
+        if norm(s) in base_by:  # ya lo tenemos: solo le añadimos los horarios
+            b = base_by[norm(s)]
+            if not b.get("gtfs") and zips.get(s): b["gtfs"] = zips[s]
+            continue
+        seen[s] = seen.get(s, 0) + 1
+        fid = f"eus-{s}" if seen[s] == 1 else f"eus-{s}-{seen[s]}"
         name = s.replace("_", " ").replace("-", " ").title()
+        if seen[s] > 1:
+            extra = re.sub(r"(gtfsrt_|_?vehicle_?positions?|\.pb)", "", u.rsplit("/", 1)[-1], flags=re.I).replace(s, "").strip("_- ")
+            name += f" {extra.replace('_', ' ').title() or seen[s]}"
         typ = "tren" if "euskotren" in s or "renfe" in s else "tranvia" if "tran" in s else "metro" if "metro" in s else "bus"
-        found.append({"id": f"eus-{s}", "name": f"{name} (Euskadi)", "type": typ, "color": PALETTE[len(found) % len(PALETTE)],
-                      "format": "pb", "url": u, "gtfs": zips.get(s), "interval": 30, "auto": True})
+        found.append({"id": fid, "name": f"{name} (Euskadi)", "type": typ, "color": PALETTE[len(found) % len(PALETTE)],
+                      "format": "pb", "url": u, "gtfs": zips.get(s) if seen[s] == 1 else None,
+                      "shareTimetable": f"eus-{s}" if seen[s] > 1 else None, "interval": 30, "auto": True})
     log(f"Euskadi: {len(found)} feeds nuevos")
     return found
 
@@ -150,7 +163,7 @@ def dump(path, obj):
 def main():
     base = json.load(open(os.path.join(ROOT, "feeds.base.json"), encoding="utf-8"))
     feeds = [f for f in base if f.get("enabled", True)]
-    feeds += discover_euskadi({f["url"] for f in feeds})
+    feeds += discover_euskadi({f["url"] for f in feeds}, feeds)
     os.makedirs(OUT, exist_ok=True)
     for f in feeds:
         if not f.get("gtfs"): continue
@@ -159,6 +172,11 @@ def main():
             log(f"✓ {f['id']}: {info['trips']} viajes hoy, {info['stops']} paradas")
         except Exception as e:
             log(f"✗ {f['id']}: {e}")
+    by_id = {f["id"]: f for f in feeds}
+    for f in feeds:
+        src = by_id.get(f.get("shareTimetable") or "")
+        if src and src.get("timetable"): f["timetable"] = dict(src["timetable"], source=src["id"])
+        f.pop("shareTimetable", None)
     for f in feeds: f.pop("gtfs", None)
     dump(os.path.join(OUT, "feeds.json"), feeds)
     log(f"feeds.json con {len(feeds)} operadores")
