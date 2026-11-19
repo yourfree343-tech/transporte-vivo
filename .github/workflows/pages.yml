@@ -1,0 +1,38 @@
+name: Publicar Transporte Vivo
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 1 * * *"   # cada noche: horarios del día nuevo
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Copiar la web
+        run: |
+          mkdir _site
+          cp -r index.html feeds-client.js feeds.base.json vendor .nojekyll _site/
+      - name: Generar horarios del día
+        run: python3 tools/build_data.py _site
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
