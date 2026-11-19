@@ -116,20 +116,35 @@
   <div class="glass" id="detail"></div>
   <div class="glass" id="nodata" style="display:none;padding:14px;font-size:13px;line-height:1.5">No llegan datos de ningún operador ahora mismo (puede que bloqueen el acceso desde el navegador). <a href="#demo" onclick="setTimeout(()=>location.reload(),50)" style="color:var(--acc)">Ver demo</a></div>
   <div class="glass" id="feeds"></div>
-  <div class="glass" id="foot">Datos abiertos GTFS-RT de cada operador (Renfe, EMT Málaga, CTB…). Mapa © OpenStreetMap · CARTO. Las posiciones pueden tener retraso según el feed. <a href="https://github.com/yourfree343-tech/transporte-vivo" style="color:inherit">Código</a></div>
+  <div class="glass" id="foot">Datos abiertos GTFS-RT de cada operador (Renfe, EMT Málaga, CTB…). Mapa © OpenStreetMap / CARTO. Las posiciones pueden tener retraso según el feed. <a href="https://github.com/yourfree343-tech/transporte-vivo" style="color:inherit">Código</a></div>
 </div>
 
 <script src="vendor/leaflet.js"></script>
 <script src="feeds-client.js"></script>
 <script>
-const TILES = {
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+// mapas: si un proveedor falla, se pasa solo al siguiente
+const TILESETS = {
+  light: [
+    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
+    { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '© OpenStreetMap · © CARTO' },
+  ],
+  dark: [
+    { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '© OpenStreetMap · © CARTO' },
+    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
+  ],
 };
+let tileIdx = 0, tileErrs = 0, tileOk = 0;
 const map = L.map('map', { zoomControl: false, preferCanvas: true, worldCopyJump: true }).setView([40.2, -3.7], 6);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 let theme = (() => { try { return localStorage.getItem('tv-theme') || 'light'; } catch { return 'light'; } })();
-const tiles = L.tileLayer(TILES[theme], { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap · © CARTO' }).addTo(map);
+const tiles = L.tileLayer(TILESETS[theme][0].url, { maxZoom: 19, subdomains: 'abcd', attribution: TILESETS[theme][0].attr }).addTo(map);
+tiles.on('tileload', () => tileOk++);
+tiles.on('tileerror', () => {
+  if (++tileErrs < 4 || tileOk > 4) return;
+  const list = TILESETS[theme]; if (tileIdx + 1 >= list.length) return;
+  tileIdx++; tileErrs = 0; tileOk = 0; tiles.setUrl(list[tileIdx].url);
+  map.attributionControl.removeAttribution(list[tileIdx - 1].attr); map.attributionControl.addAttribution(list[tileIdx].attr);
+});
 document.body.classList.toggle('light', theme === 'light');
 
 // ---------- estado ----------
@@ -487,7 +502,7 @@ document.addEventListener('keydown', e => {
 });
 
 $('theme').onclick = () => {
-  theme = theme === 'dark' ? 'light' : 'dark'; tiles.setUrl(TILES[theme]);
+  theme = theme === 'dark' ? 'light' : 'dark'; tileIdx = 0; tileErrs = 0; tileOk = 0; tiles.setUrl(TILESETS[theme][0].url);
   document.body.classList.toggle('light', theme === 'light');
   try { localStorage.setItem('tv-theme', theme); } catch {}
 };

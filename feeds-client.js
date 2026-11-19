@@ -1,6 +1,13 @@
 // Lector de feeds GTFS-RT en el navegador: JSON o protobuf, con proxy CORS de respaldo.
 (function () {
-  const PROXIES = [u => u, u => 'https://corsproxy.io/?url=' + encodeURIComponent(u)];
+  // directo primero; si el operador bloquea el navegador (CORS), proxies gratuitos sin clave.
+  // Se puede añadir uno propio (p. ej. un Cloudflare Worker) en config.json → "proxy": "https://…/?url="
+  const PROXIES = [
+    u => u,
+    u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  ];
+  fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => { if (c && c.proxy) PROXIES.splice(1, 0, u => c.proxy + encodeURIComponent(u)); }).catch(() => {});
 
   // ---------- decodificador protobuf mínimo para VehiclePosition ----------
   function Reader(buf) { this.b = buf; this.p = 0; this.dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength); }
@@ -70,11 +77,12 @@
   // ---------- sondeo ----------
   async function fetchFeed(feed) {
     const order = feed._proxy != null ? [feed._proxy, ...PROXIES.keys()].filter((x, i, a) => a.indexOf(x) === i) : [...PROXIES.keys()];
+    let lastStatus = null;
     let lastErr;
     for (const i of order) {
       try {
         const res = await fetch(PROXIES[i](feed.url), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) { lastStatus = res.status; throw new Error('HTTP ' + res.status); }
         let ents;
         if (feed.format === 'json') { const j = await res.json(); ents = j.entity || j.entities || []; }
         else ents = decodePB(await res.arrayBuffer());
@@ -82,11 +90,11 @@
         return { list: ents.map(e => normalize(feed, e)).filter(Boolean), via: i ? 'proxy' : 'directo' };
       } catch (e) { lastErr = e; }
     }
-    throw lastErr;
+    throw new Error(lastStatus === 401 || lastStatus === 403 ? 'el operador pide clave o bloquea el acceso' : lastStatus === 404 ? 'dirección de datos no encontrada' : 'no responde ahora mismo');
   }
 
   async function getVia(feed, url) {
-    const order = feed._proxy != null ? [feed._proxy, 0, 1].filter((x, i, a) => a.indexOf(x) === i) : [0, 1];
+    const order = feed._proxy != null ? [feed._proxy, ...PROXIES.keys()].filter((x, i, a) => a.indexOf(x) === i) : [...PROXIES.keys()];
     let err;
     for (const i of order) {
       try { const r = await fetch(PROXIES[i](url), { cache: 'no-store', signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error('HTTP ' + r.status); return r; }
