@@ -9,115 +9,150 @@
 <link rel="stylesheet" href="vendor/leaflet.css">
 <style>
   :root{
-    --bg:#07080d; --panel:rgba(14,16,26,.78); --line:rgba(255,255,255,.08);
-    --txt:#e8eaf2; --dim:#8a90a6; --acc:#10b981; --red:#ff2d55;
-    --font:'Space Grotesk',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+    --bg:#e9edf2; --card:#ffffff; --card2:#f4f6f9; --line:rgba(15,23,42,.08); --txt:#0f172a; --dim:#64748b;
+    --acc:#0ea56b; --red:#e11d48; --shadow:0 8px 30px rgba(15,23,42,.18);
+    --font:'Space Grotesk',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
   }
-  body.light{ --bg:#eef0f5; --panel:rgba(255,255,255,.85); --line:rgba(0,0,0,.08); --txt:#141622; --dim:#5d6377; }
-  *{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:var(--font);overflow:hidden}
-  #map{position:absolute;inset:0;background:var(--bg)}
+  body.dark{ --bg:#0b0d14; --card:#151925; --card2:#1d2231; --line:rgba(255,255,255,.08); --txt:#e8eaf2; --dim:#8b93a7; --shadow:0 8px 30px rgba(0,0,0,.5); }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:var(--font);overflow:hidden;overscroll-behavior:none}
+  button{font-family:inherit;color:inherit}
+  #map{position:fixed;inset:0;background:var(--bg)}
   .leaflet-container{background:var(--bg);font-family:var(--font)}
-  .leaflet-control-attribution{background:transparent!important;color:var(--dim)!important;font-size:10px}
-  .leaflet-control-attribution a{color:var(--dim)!important}
-  .leaflet-control-zoom a{background:var(--panel)!important;color:var(--txt)!important;border-color:var(--line)!important;backdrop-filter:blur(12px)}
+  .leaflet-control-attribution{background:rgba(255,255,255,.7)!important;font-size:9px;border-radius:6px 0 0 0}
+  body.dark .leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#aaa}
+  .leaflet-control-zoom{border:0!important;box-shadow:var(--shadow)!important;border-radius:14px!important;overflow:hidden}
+  .leaflet-control-zoom a{background:var(--card)!important;color:var(--txt)!important;border-color:var(--line)!important;width:40px!important;height:40px!important;line-height:40px!important}
 
-  .glass{background:var(--panel);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  /* barra de búsqueda */
+  #top{position:fixed;z-index:1001;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;max-width:520px}
+  #search{display:flex;align-items:center;gap:10px;height:52px;padding:0 8px 0 16px;background:var(--card);border-radius:26px;box-shadow:var(--shadow)}
+  #logo{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,#0ea56b,#0891b2);display:grid;place-items:center;color:#fff;font-size:15px;flex:none}
+  #search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--txt);font:16px var(--font)}
+  #search input::placeholder{color:var(--dim)}
+  #search input::-webkit-search-cancel-button{display:none;-webkit-appearance:none}
+  #clear{display:none;border:0;background:var(--card2);width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer}
+  .live{display:inline-flex;align-items:center;gap:6px;font:700 10px var(--mono);letter-spacing:.08em;color:var(--red);padding:6px 10px;border-radius:99px;background:rgba(225,29,72,.1);flex:none}
+  .live i{width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.6s infinite}
+  .live.demo{color:#b45309;background:rgba(245,158,11,.15)}
+  @keyframes blink{50%{opacity:.25}}
+  #results{display:none;margin-top:8px;background:var(--card);border-radius:18px;box-shadow:var(--shadow);max-height:55vh;overflow:auto;padding:6px}
+  #results div{padding:12px;border-radius:12px;cursor:pointer;display:flex;gap:10px;align-items:center;font-size:15px}
+  #results div.sel,#results div:active{background:var(--card2)}
+  #results .r-sub{color:var(--dim);font-size:13px;margin-left:auto;text-align:right}
 
-  /* cabecera */
-  #top{position:absolute;top:calc(14px + env(safe-area-inset-top));left:14px;right:14px;display:flex;gap:10px;align-items:center;z-index:1000;pointer-events:none}
-  #brand{pointer-events:auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
-  #brand h1{margin:0;font-size:17px;letter-spacing:-.02em;font-weight:700}
-  #brand h1 span{color:var(--acc)}
-  .live{display:inline-flex;align-items:center;gap:6px;font:600 10px var(--mono);letter-spacing:.12em;color:var(--red);padding:3px 8px;border-radius:99px;background:rgba(255,45,85,.12)}
-  .live i{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.4s infinite}
-  .live.demo{color:#fbbf24;background:rgba(251,191,36,.12)} .live.demo i{background:#fbbf24}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
-  #search{pointer-events:auto;flex:1;max-width:380px;padding:0 14px;display:flex;align-items:center;gap:8px;height:48px}
-  #search input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:15px var(--font)}
-  #search kbd{font:11px var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
-  #results{position:absolute;top:56px;left:0;right:0;max-height:300px;overflow:auto;padding:6px;display:none}
-  #results div{padding:8px 10px;border-radius:10px;cursor:pointer;display:flex;gap:8px;align-items:center;font-size:14px}
-  #results div:hover,#results div.sel{background:rgba(255,255,255,.07)}
-  .iconbtn{pointer-events:auto;width:48px;height:48px;display:grid;place-items:center;cursor:pointer;color:var(--txt);font-size:18px;border:1px solid var(--line)}
-  #clock{margin-left:auto;pointer-events:auto;padding:10px 16px;font:600 20px var(--mono);letter-spacing:.04em}
+  /* botones flotantes */
+  #fabs{position:fixed;z-index:1000;right:12px;top:calc(76px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:8px}
+  .fab{width:44px;height:44px;border-radius:14px;border:0;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;cursor:pointer;font-size:18px}
+  .fab:active{transform:scale(.94)}
+  .fab svg{width:20px;height:20px;stroke:var(--txt);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-  /* panel lateral */
-  #side{position:absolute;left:14px;top:calc(78px + env(safe-area-inset-top));width:320px;bottom:14px;z-index:999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
-  #side>*{pointer-events:auto}
-  #stats{padding:16px}
-  #total{font:700 44px var(--mono);letter-spacing:-.04em;line-height:1}
-  #total small{font:500 13px var(--font);color:var(--dim);letter-spacing:0;margin-left:6px}
-  #spark{width:100%;height:36px;margin-top:10px;display:block}
-  #feeds{padding:8px;overflow:auto;flex:0 1 auto}
-  .feed{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;cursor:pointer;user-select:none;transition:.2s}
-  .feed:hover{background:rgba(255,255,255,.05)}
-  .feed.off{opacity:.38}
-  .dot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 12px currentColor;background:currentColor}
-  .feed .nm{flex:1;font-size:14px;line-height:1.2}
-  .feed .nm em{display:block;font:normal 11px var(--mono);color:var(--dim);margin-top:2px}
-  .feed .ct{font:600 15px var(--mono)}
-  .feed .err{color:#fb7185}
-  #detail{padding:16px;display:none}
-  #detail h2{margin:0 0 2px;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
-  #detail .sub{color:var(--dim);font-size:13px;margin-bottom:12px}
-  #detail dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:13px}
-  #detail dt{color:var(--dim)} #detail dd{margin:0;font-family:var(--mono);word-break:break-all}
-  .row{display:flex;gap:8px;margin-top:14px}
-  .btn{flex:1;padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);font:600 13px var(--font);cursor:pointer}
-  .btn.on{background:var(--acc);color:#04120b;border-color:transparent}
-  #foot{margin-top:auto;padding:10px 14px;font-size:11px;color:var(--dim);line-height:1.5}
-  #toggle{display:none}
-  #detail{max-height:58vh;overflow:auto}
-  .chip{display:inline-block;padding:2px 8px;border-radius:7px;font:700 12px var(--mono);color:#fff;background:#666;min-width:28px;text-align:center}
-  .late{color:#e11d48;font-weight:700} .ontime{color:#059669;font-weight:700}
-  .tl{list-style:none;margin:12px 0 0;padding:0;position:relative}
-  .tl li{display:flex;gap:10px;align-items:center;padding:5px 0 5px 18px;position:relative;font-size:13px}
-  .tl li:before{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;background:var(--line)}
-  .tl li:after{content:'';position:absolute;left:0;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:50%;background:var(--panel);border:2px solid var(--dim)}
-  .tl li.past{opacity:.45} .tl li.next:after{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 4px rgba(16,185,129,.25)}
-  .tl li .tm{font:600 12px var(--mono);margin-left:auto;white-space:nowrap}
-  .dep{display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer}
-  .dep .tm{font:700 14px var(--mono);min-width:48px}
-  .dep .hd{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--acc);display:inline-block;margin-left:4px}
-  .muted{color:var(--dim);font-size:12px}
-
-  @media (max-width:720px){
-    #search{max-width:none;min-width:0} #clock,#brand h1{display:none} #brand{padding:10px} .iconbtn{width:44px;flex:none} #top{gap:6px;left:8px;right:8px} .leaflet-bottom.leaflet-right{display:none} #search kbd{display:none}
-    #side{left:8px;right:8px;width:auto;top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-height:52vh;transform:translateY(calc(100% - 120px));transition:transform .35s cubic-bezier(.2,.8,.2,1)}
-    #side.open{transform:none}
-    #toggle{display:block;width:44px;height:5px;border-radius:9px;background:var(--dim);opacity:.5;margin:0 auto 4px;cursor:pointer}
-    #stats{padding:12px 14px} #total{font-size:34px} #foot{display:none}
+  /* panel inferior (móvil) / lateral (ordenador) */
+  #sheet{position:fixed;z-index:1002;left:0;right:0;bottom:0;height:92dvh;background:var(--card);border-radius:22px 22px 0 0;box-shadow:0 -6px 30px rgba(15,23,42,.18);display:flex;flex-direction:column;transform:translateY(calc(100% - 190px));transition:transform .32s cubic-bezier(.2,.8,.2,1);will-change:transform}
+  #sheet.dragging{transition:none}
+  #grab{flex:none;padding:10px 0 4px;cursor:grab;touch-action:none}
+  #grab i{display:block;width:40px;height:5px;border-radius:9px;background:var(--dim);opacity:.35;margin:0 auto}
+  #body{flex:1;overflow:auto;padding:4px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  @media (min-width:900px){
+    #top{left:16px;top:16px;width:380px}
+    #fabs{right:16px;top:16px}
+    #sheet{left:16px;right:auto;top:80px;bottom:auto;max-height:calc(100vh - 96px);width:380px;height:auto;border-radius:20px;transform:none!important;box-shadow:var(--shadow)}
+    #grab{display:none} #body{padding-top:14px}
   }
+  @media (max-width:899px){ .leaflet-control-zoom{display:none} }
+  @media (max-width:420px){ .live{padding:6px 8px;font-size:0;gap:0} .live i{width:9px;height:9px} }
+
+  /* inicio */
+  #hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:2px 2px 12px}
+  #total{font:700 36px var(--mono);letter-spacing:-.04em;line-height:1}
+  #total small{display:block;font:500 13px var(--font);color:var(--dim);letter-spacing:0;margin-top:4px}
+  #spark{width:110px;height:36px;flex:none}
+  #types{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+  #types::-webkit-scrollbar{display:none}
+  .type{flex:none;display:flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--card2);font:600 14px var(--font);cursor:pointer;white-space:nowrap}
+  .type b{font:700 13px var(--mono);color:var(--dim)}
+  .type.on{background:var(--txt);color:var(--card);border-color:var(--txt)} .type.on b{color:inherit;opacity:.7}
+  .sect{font:700 12px var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:14px 2px 6px;display:flex;justify-content:space-between;align-items:center}
+  .sect button{border:0;background:none;color:var(--acc);font:600 13px var(--font);cursor:pointer;text-transform:none;letter-spacing:0}
+  .feed{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 2px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+  .feed:last-child{border-bottom:0}
+  .feed .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:none}
+  .feed .nm{flex:1;min-width:0;font-size:15px;line-height:1.25}
+  .feed .nm em{display:block;font:normal 12px var(--font);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .feed .nm em.err{color:var(--red)}
+  .feed .ct{font:700 14px var(--mono);color:var(--dim);min-width:26px;text-align:right}
+  .sw{width:42px;height:26px;border-radius:13px;background:var(--line);position:relative;flex:none;transition:.2s}
+  .sw:after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:.2s}
+  .feed.on .sw{background:var(--acc)} .feed.on .sw:after{left:19px}
+  .feed:not(.on) .ic{filter:grayscale(1);opacity:.5}
+  #foot{font-size:12px;color:var(--dim);line-height:1.5;margin-top:16px}
+  #foot a{color:inherit}
+  #nodata{display:none;background:rgba(245,158,11,.12);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;margin-bottom:8px}
+  #nodata a{color:#b45309;font-weight:700}
+
+  /* ficha */
+  #detail{display:none}
+  .dh{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+  .dh h2{flex:1;margin:0;font-size:21px;line-height:1.2;letter-spacing:-.02em}
+  .x{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--card2);font-size:16px;cursor:pointer}
+  .sub{color:var(--dim);font-size:14px;margin-bottom:14px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:var(--card2);border-radius:14px;padding:10px 12px}
+  .stat small{display:block;color:var(--dim);font-size:11px;margin-bottom:2px}
+  .stat b{font:700 15px var(--mono)}
+  .row{display:flex;gap:8px;margin:4px 0 6px}
+  .btn{flex:1;height:44px;border-radius:14px;border:0;background:var(--card2);font:600 15px var(--font);cursor:pointer}
+  .btn.on{background:var(--acc);color:#fff}
+  .chip{display:inline-block;padding:3px 9px;border-radius:8px;font:700 13px var(--mono);color:#fff;background:#666;min-width:30px;text-align:center;vertical-align:middle}
+  .late{color:var(--red);font-weight:700} .ontime{color:var(--acc);font-weight:700}
+  .tl{list-style:none;margin:10px 0 0;padding:0}
+  .tl li{display:flex;gap:10px;align-items:center;min-height:44px;padding:4px 0 4px 26px;position:relative;font-size:15px;cursor:pointer}
+  .tl li:before{content:'';position:absolute;left:8px;top:0;bottom:0;width:3px;background:var(--line)}
+  .tl li:first-child:before{top:50%} .tl li:last-child:before{bottom:50%}
+  .tl li:after{content:'';position:absolute;left:3px;top:50%;width:13px;height:13px;margin-top:-6.5px;border-radius:50%;background:var(--card);border:3px solid var(--dim)}
+  .tl li.past{color:var(--dim)} .tl li.past:after{border-color:var(--line);background:var(--line)}
+  .tl li.next{font-weight:700} .tl li.next:after{background:var(--acc);border-color:var(--acc);box-shadow:0 0 0 5px rgba(14,165,107,.2)}
+  .tl li .tm{font:600 14px var(--mono);margin-left:auto;white-space:nowrap}
+  .dep{display:flex;gap:10px;align-items:center;min-height:52px;border-bottom:1px solid var(--line);font-size:15px;cursor:pointer}
+  .dep .tm{font:700 16px var(--mono);min-width:54px}
+  .dep .hd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);flex:none;box-shadow:0 0 0 4px rgba(14,165,107,.2)}
+  .muted{color:var(--dim);font-size:14px}
 </style>
 </head>
-<body>
+<body class="light">
 <div id="map"></div>
 
 <div id="top">
-  <div id="brand" class="glass"><h1>Transporte <span>Vivo</span></h1><span class="live" id="live"><i></i>EN DIRECTO</span></div>
-  <div id="search" class="glass" style="position:relative">
-    <span style="opacity:.6">⌕</span>
-    <input id="q" placeholder="Busca estación, línea o tren…" autocomplete="off">
-    <kbd>/</kbd>
-    <div id="results" class="glass"></div>
+  <div id="search">
+    <span id="logo">🚆</span>
+    <input id="q" type="search" enterkeyhint="search" placeholder="Buscar estación o tren" autocomplete="off">
+    <button id="clear" aria-label="Borrar">✕</button>
+    <span class="live" id="live"><i></i>EN DIRECTO</span>
   </div>
-  <button class="glass iconbtn" id="theme" title="Modo claro/oscuro">◐</button>
-  <button class="glass iconbtn" id="fit" title="Ver toda España">⤢</button>
-  <div id="clock" class="glass">--:--:--</div>
+  <div id="results"></div>
 </div>
 
-<div id="side">
-  <div class="glass" id="stats">
-    <div id="toggle"></div>
-    <div id="total">0<small>vehículos en movimiento</small></div>
-    <svg id="spark" viewBox="0 0 300 36" preserveAspectRatio="none"></svg>
-  </div>
-  <div class="glass" id="detail"></div>
-  <div class="glass" id="nodata" style="display:none;padding:14px;font-size:13px;line-height:1.5">No llegan datos de ningún operador ahora mismo (puede que bloqueen el acceso desde el navegador). <a href="#demo" onclick="setTimeout(()=>location.reload(),50)" style="color:var(--acc)">Ver demo</a></div>
-  <div class="glass" id="feeds"></div>
-  <div class="glass" id="foot">Datos abiertos GTFS-RT de cada operador (Renfe, EMT Málaga, CTB…). Mapa © OpenStreetMap / CARTO. Las posiciones pueden tener retraso según el feed. <a href="https://github.com/yourfree343-tech/transporte-vivo" style="color:inherit">Código</a></div>
+<div id="fabs">
+  <button class="fab" id="locate" title="Mi ubicación"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button>
+  <button class="fab" id="fit" title="Ver toda España"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="fab" id="theme" title="Modo claro/oscuro"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
 </div>
+
+<section id="sheet">
+  <div id="grab"><i></i></div>
+  <div id="body">
+    <div id="home">
+      <div id="hero"><div id="total">0<small>vehículos en directo</small></div><svg id="spark" viewBox="0 0 300 36" preserveAspectRatio="none"></svg></div>
+      <div id="types"></div>
+      <div id="nodata">No llegan datos ahora mismo. Puede que algún operador esté caído o bloquee el acceso. <a href="#demo" onclick="setTimeout(()=>location.reload(),50)">Ver demo</a></div>
+      <div class="sect">Operadores <button id="allBtn">Todos</button></div>
+      <div id="feeds"></div>
+      <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a></div>
+    </div>
+    <div id="detail"></div>
+  </div>
+</section>
 
 <script src="vendor/leaflet.js"></script>
 <script src="feeds-client.js"></script>
@@ -136,7 +171,9 @@ const TILESETS = {
 let tileIdx = 0, tileErrs = 0, tileOk = 0;
 const map = L.map('map', { zoomControl: false, preferCanvas: true, worldCopyJump: true }).setView([40.2, -3.7], 6);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
+map.attributionControl.setPrefix(false);
 let theme = (() => { try { return localStorage.getItem('tv-theme') || 'light'; } catch { return 'light'; } })();
+const TOUCH = matchMedia('(pointer: coarse)').matches;
 const tiles = L.tileLayer(TILESETS[theme][0].url, { maxZoom: 19, subdomains: 'abcd', attribution: TILESETS[theme][0].attr }).addTo(map);
 tiles.on('tileload', () => tileOk++);
 tiles.on('tileerror', () => {
@@ -145,7 +182,7 @@ tiles.on('tileerror', () => {
   tileIdx++; tileErrs = 0; tileOk = 0; tiles.setUrl(list[tileIdx].url);
   map.attributionControl.removeAttribution(list[tileIdx - 1].attr); map.attributionControl.addAttribution(list[tileIdx].attr);
 });
-document.body.classList.toggle('light', theme === 'light');
+document.body.classList.toggle('dark', theme === 'dark');
 
 // ---------- estado ----------
 const feeds = new Map();      // id -> {name,type,color,status,on}
@@ -171,7 +208,7 @@ const VehicleLayer = L.Layer.extend({
   draw(now) {
     const m = this._map, ctx = this._ctx, s = m.getSize(), z = m.getZoom();
     ctx.clearRect(0, 0, s.x, s.y);
-    const r = Math.max(2.5, Math.min(7, (z - 3) * 0.9));
+    const r = Math.max(3.5, Math.min(8, (z - 2.5) * 0.9));
     this._pts = []; this._st = [];
     // estaciones / paradas
     const b = m.getBounds().pad(0.1);
@@ -180,7 +217,7 @@ const VehicleLayer = L.Layer.extend({
       if (!f.on) continue; const md = TT.stopsOf(fid); if (!md || drawn.has(md)) continue; drawn.add(md);
       const rail = f.type !== 'bus';
       if (z < (rail ? 10 : 14)) continue;
-      ctx.fillStyle = theme === 'dark' ? '#0e101a' : '#fff'; ctx.strokeStyle = f.color; ctx.lineWidth = 2;
+      ctx.fillStyle = theme === 'dark' ? '#151925' : '#fff'; ctx.strokeStyle = f.color; ctx.lineWidth = 2;
       const sz = rail ? (z >= 13 ? 5 : 3.5) : 3;
       for (const sid in md.stops) {
         const s = md.stops[sid]; if (!b.contains([s[1], s[2]])) continue;
@@ -188,7 +225,7 @@ const VehicleLayer = L.Layer.extend({
         this._st.push([p.x, p.y, fid, sid]);
         const isSel = selStation && selStation.stop === sid && selStation.feed === fid;
         ctx.beginPath(); ctx.arc(p.x, p.y, isSel ? sz + 3 : sz, 0, 7); ctx.fill(); ctx.stroke();
-        if (rail && z >= 13 || isSel) { ctx.font = '500 11px Space Grotesk, sans-serif'; ctx.fillStyle = theme === 'dark' ? '#cfd3e0' : '#334'; ctx.fillText(s[0], p.x + sz + 4, p.y - sz - 2); ctx.fillStyle = theme === 'dark' ? '#0e101a' : '#fff'; }
+        if (rail && z >= 13 || isSel) { ctx.font = '600 12px Space Grotesk, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = theme === 'dark' ? '#0b0d14' : '#fff'; ctx.strokeText(s[0], p.x + sz + 4, p.y - sz - 2); ctx.fillStyle = theme === 'dark' ? '#cfd3e0' : '#1e293b'; ctx.fillText(s[0], p.x + sz + 4, p.y - sz - 2); ctx.fillStyle = theme === 'dark' ? '#151925' : '#fff'; ctx.strokeStyle = f.color; ctx.lineWidth = 2; }
       }
     }
     // estela del seleccionado
@@ -222,8 +259,8 @@ const VehicleLayer = L.Layer.extend({
         ctx.lineTo(p.x + Math.cos(a + 2.4) * rr, p.y + Math.sin(a + 2.4) * rr);
         ctx.lineTo(p.x + Math.cos(a - 2.4) * rr, p.y + Math.sin(a - 2.4) * rr); ctx.fill();
       }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, rr + 1.5, 0, 7); ctx.fill();
       ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, 7); ctx.fill();
-      ctx.fillStyle = theme === 'dark' ? '#fff' : '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, rr * .42, 0, 7); ctx.fill();
       if (isSel) {
         const pulse = (now % 1600) / 1600;
         ctx.strokeStyle = f.color; ctx.globalAlpha = 1 - pulse; ctx.lineWidth = 2;
@@ -231,18 +268,18 @@ const VehicleLayer = L.Layer.extend({
       }
       // etiqueta de línea con zoom alto
       if (z >= 13 && v.route) {
-        ctx.font = '600 11px JetBrains Mono, monospace'; ctx.fillStyle = theme === 'dark' ? '#e8eaf2' : '#141622';
-        ctx.fillText(v.route, p.x + rr + 5, p.y + 4);
+        ctx.font = '700 12px JetBrains Mono, monospace'; ctx.lineWidth = 3; ctx.strokeStyle = theme === 'dark' ? '#0b0d14' : '#fff';
+        ctx.strokeText(v.route, p.x + rr + 5, p.y + 4); ctx.fillStyle = theme === 'dark' ? '#e8eaf2' : '#0f172a'; ctx.fillText(v.route, p.x + rr + 5, p.y + 4);
       }
     }
   },
   hitStation(pt) {
-    let best = null, bd = 12 * 12;
+    let best = null, bd = (TOUCH ? 22 : 12) ** 2;
     for (const [x, y, fid, sid] of this._st || []) { const d = (x - pt.x) ** 2 + (y - pt.y) ** 2; if (d < bd) { bd = d; best = [fid, sid]; } }
     return best;
   },
   hit(pt) {
-    let best = null, bd = 18 * 18;
+    let best = null, bd = (TOUCH ? 30 : 18) ** 2;
     for (const [x, y, id] of this._pts || []) { const d = (x - pt.x) ** 2 + (y - pt.y) ** 2; if (d < bd) { bd = d; best = id; } }
     return best;
   }
@@ -252,7 +289,7 @@ const layer = new VehicleLayer().addTo(map);
 
 map.on('click', e => { const id = layer.hit(e.containerPoint); if (id) return select(id); const st = layer.hitStation(e.containerPoint); if (st) return selectStation(st[0], st[1]); select(null); });
 map.on('mousemove', e => { map.getContainer().style.cursor = layer.hit(e.containerPoint) || layer.hitStation(e.containerPoint) ? 'pointer' : ''; });
-map.on('dragstart', () => { if (follow) { follow = false; renderDetail(); } });
+map.on('dragstart', () => { if (follow) { follow = false; renderDetail(); } if (SHEET.state === 'full') SHEET.set('half'); });
 
 // ---------- datos ----------
 function upsert(v) {
@@ -292,6 +329,7 @@ async function boot() {
       if (demoMode) return;
       trailUpdate(data); applyFeed(id, data);
       feeds.get(id).status = { ok: true, last: Date.now(), via };
+      document.getElementById('nodata').style.display = 'none';
       setBadge('EN DIRECTO', false); renderFeeds(); renderTotal(); if (selected) renderDetail();
     },
     (id, err) => { if (demoMode) return; feeds.get(id).status = { ok: false, error: err, last: Date.now() }; renderFeeds(); });
@@ -327,42 +365,110 @@ boot();
 
 // ---------- interfaz ----------
 const $ = id => document.getElementById(id);
+const TYPES = [['alta-velocidad', '🚄', 'AVE y Larga Dist.'], ['tren', '🚆', 'Trenes'], ['metro', '🚇', 'Metro'], ['tranvia', '🚊', 'Tranvía'], ['bus', '🚌', 'Bus'], ['ferry', '⛴️', 'Ferry']];
 function countFor(id) { let n = 0; for (const v of vehicles.values()) if (v.feed === id) n++; return n; }
+function saveOff() { try { const o = {}; feeds.forEach((x, k) => { if (!x.on) o[k] = 1; }); localStorage.setItem('tv-off', JSON.stringify(o)); } catch {} }
+
+// panel inferior arrastrable (móvil)
+const SHEET = (() => {
+  const el = $('sheet'), grab = $('grab'), body = $('body');
+  const desk = () => matchMedia('(min-width:900px)').matches;
+  const H = { peek: () => 190, half: () => Math.round(innerHeight * 0.5), full: () => Math.round(innerHeight * 0.92) };
+  const api = { state: 'peek' };
+  const place = (px, anim = true) => { el.classList.toggle('dragging', !anim); el.style.transform = desk() ? '' : `translateY(${el.offsetHeight - px}px)`; };
+  api.visible = () => desk() ? 0 : H[api.state]();
+  api.set = st => { api.state = st; place(H[st]()); if (st !== 'full') body.scrollTop = body.scrollTop; };
+  let y0, h0, t0, moved;
+  const start = e => { if (desk()) return; y0 = e.clientY; h0 = H[api.state](); t0 = Date.now(); moved = false; grab.setPointerCapture(e.pointerId); };
+  const move = e => { if (y0 == null) return; const dy = e.clientY - y0; if (Math.abs(dy) > 4) moved = true; place(Math.max(120, Math.min(H.full(), h0 - dy)), false); };
+  const end = e => {
+    if (y0 == null) return; const dy = e.clientY - y0, v = dy / Math.max(1, Date.now() - t0); y0 = null;
+    if (!moved) return api.set(api.state === 'peek' ? 'half' : api.state === 'half' ? 'full' : 'peek');
+    const h = h0 - dy, order = ['peek', 'half', 'full'];
+    let st = order.reduce((b, k) => Math.abs(H[k]() - h) < Math.abs(H[b]() - h) ? k : b, 'peek');
+    if (v < -0.5) st = order[Math.min(2, order.indexOf(api.state) + 1)]; if (v > 0.5) st = order[Math.max(0, order.indexOf(api.state) - 1)];
+    api.set(st);
+  };
+  grab.addEventListener('pointerdown', start); grab.addEventListener('pointermove', move);
+  grab.addEventListener('pointerup', end); grab.addEventListener('pointercancel', end);
+  // también se puede arrastrar desde la cabecera de la ficha o el resumen cuando el contenido está arriba del todo
+  let ty0 = null;
+  body.addEventListener('touchstart', e => { ty0 = body.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+  body.addEventListener('touchmove', e => {
+    if (ty0 == null || desk()) return; const dy = e.touches[0].clientY - ty0;
+    if (dy > 40 && body.scrollTop <= 0) { ty0 = null; api.set(api.state === 'full' ? 'half' : 'peek'); }
+    else if (dy < -30 && api.state !== 'full') { ty0 = null; api.set(api.state === 'peek' ? 'half' : 'full'); }
+  }, { passive: true });
+  addEventListener('resize', () => api.set(api.state));
+  requestAnimationFrame(() => api.set('peek'));
+  return api;
+})();
+// centra un punto teniendo en cuenta el panel que tapa la parte de abajo
+function flyVisible(latlng, zoom, dur = 1.2) {
+  const z = zoom ?? map.getZoom(), off = SHEET.visible() / 2;
+  const c = map.unproject(map.project(latlng, z).add([0, off]), z);
+  map.flyTo(c, z, { duration: dur });
+}
+
+let feedsKey = '';
 function renderFeeds() {
-  $('feeds').innerHTML = [...feeds.values()].map(f => {
-    const st = f.status || {}, n = countFor(f.id);
-    const sub = st.ok === false ? `<span class="err">sin conexión · ${st.error}</span>` : st.last ? `actualizado ${ago(st.last)}${st.via === 'proxy' ? ' · vía proxy' : ''}` : 'conectando…';
-    return `<div class="feed ${f.on ? '' : 'off'}" data-id="${f.id}">
-      <span class="dot" style="color:${f.color}"></span>
-      <div class="nm">${ICON[f.type] || '•'} ${f.name}<em>${sub}</em></div>
-      <span class="ct">${n}</span></div>`;
+  // chips por tipo
+  const byType = {};
+  for (const f of feeds.values()) (byType[f.type] = byType[f.type] || []).push(f);
+  const tc = {}; for (const v of vehicles.values()) { const f = feeds.get(v.feed); if (f) tc[f.type] = (tc[f.type] || 0) + 1; }
+  $('types').innerHTML = TYPES.filter(([t]) => byType[t]).map(([t, ic, nm]) => {
+    const on = byType[t].some(f => f.on);
+    return `<button class="type ${on ? 'on' : ''}" data-type="${t}">${ic} ${nm} <b>${(tc[t] || 0).toLocaleString('es-ES')}</b></button>`;
   }).join('');
+  // lista de operadores: se construye una vez y luego solo se actualizan textos
+  const key = [...feeds.keys()].join('|');
+  if (key !== feedsKey) {
+    feedsKey = key;
+    const order = [...feeds.values()].sort((a, b) => TYPES.findIndex(t => t[0] === a.type) - TYPES.findIndex(t => t[0] === b.type));
+    $('feeds').innerHTML = order.map(f => `<div class="feed" data-id="${f.id}">
+      <span class="ic" style="background:${f.color}22">${ICON[f.type] || '•'}</span>
+      <div class="nm">${f.name}<em></em></div><span class="ct"></span><span class="sw"></span></div>`).join('');
+  }
+  for (const row of $('feeds').children) {
+    const f = feeds.get(row.dataset.id), st = f.status || {}, em = row.querySelector('em');
+    row.classList.toggle('on', f.on);
+    row.querySelector('.ct').textContent = countFor(f.id) || '';
+    em.className = st.ok === false ? 'err' : '';
+    em.textContent = st.ok === false ? st.error : st.last ? `actualizado ${ago(st.last)}` : f.on ? 'conectando…' : 'oculto';
+  }
 }
 $('feeds').addEventListener('click', e => {
   const el = e.target.closest('.feed'); if (!el) return;
-  const f = feeds.get(el.dataset.id); f.on = !f.on;
-  try { const o = {}; feeds.forEach((x, k) => { if (!x.on) o[k] = 1; }); localStorage.setItem('tv-off', JSON.stringify(o)); } catch {}
-  renderFeeds(); renderTotal();
+  const f = feeds.get(el.dataset.id); f.on = !f.on; saveOff(); renderFeeds(); renderTotal();
 });
+$('types').addEventListener('click', e => {
+  const el = e.target.closest('.type'); if (!el) return;
+  const list = [...feeds.values()].filter(f => f.type === el.dataset.type), on = !list.some(f => f.on);
+  list.forEach(f => f.on = on); saveOff(); renderFeeds(); renderTotal();
+});
+$('allBtn').onclick = () => { const on = ![...feeds.values()].every(f => f.on); feeds.forEach(f => f.on = on); saveOff(); renderFeeds(); renderTotal(); };
 function renderTotal() {
   let n = 0; for (const v of vehicles.values()) if (feeds.get(v.feed)?.on) n++;
   $('total').firstChild.textContent = n.toLocaleString('es-ES');
   hist.push(n); if (hist.length > 60) hist.shift();
   const max = Math.max(...hist, 1), min = Math.min(...hist);
   const pts = hist.map((h, i) => `${(i / Math.max(1, hist.length - 1)) * 300},${34 - ((h - min) / Math.max(1, max - min)) * 30}`).join(' ');
-  $('spark').innerHTML = `<defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#38f8a8" stop-opacity=".35"/><stop offset="1" stop-color="#38f8a8" stop-opacity="0"/></linearGradient></defs>
-    <polygon points="0,36 ${pts} 300,36" fill="url(#g)"/><polyline points="${pts}" fill="none" stroke="#38f8a8" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+  $('spark').innerHTML = `<defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#0ea56b" stop-opacity=".3"/><stop offset="1" stop-color="#0ea56b" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="0,36 ${pts} 300,36" fill="url(#g)"/><polyline points="${pts}" fill="none" stroke="#0ea56b" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
 }
-function ago(t) { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `hace ${s}s` : `hace ${Math.round(s / 60)} min`; }
+function ago(t) { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `hace ${s} s` : `hace ${Math.round(s / 60)} min`; }
 
+function showHome(on) { $('home').style.display = on ? 'block' : 'none'; $('detail').style.display = on ? 'none' : 'block'; }
 function select(id) {
+  const was = !!(selected || selStation);
   selected = id; follow = false; selStation = null; $('detail')._scrolled = false;
-  if (id) { $('side').classList.add('open'); }
+  if (id) { showHome(false); $('body').scrollTop = 0; if (SHEET.state === 'peek') SHEET.set('half'); }
+  else { showHome(true); if (was) SHEET.set('peek'); }
   renderDetail();
 }
 function fmtT(sec) { sec = ((sec % 86400) + 86400) % 86400; return String(Math.floor(sec / 3600)).padStart(2, '0') + ':' + String(Math.floor(sec % 3600 / 60)).padStart(2, '0'); }
 function nowSec() { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' })); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); }
-function delayTxt(d) { if (d == null) return ''; const m = Math.round(d / 60); return m > 0 ? `<span class="late">+${m} min</span>` : `<span class="ontime">puntual</span>`; }
+function delayTxt(d) { if (d == null) return ''; const m = Math.round(d / 60); return m > 0 ? `<span class="late">+${m} min</span>` : `<span class="ontime">Puntual</span>`; }
 function chip(feedId, rid, fallback) {
   const r = TT.route(feedId, rid), f = feeds.get(feedId);
   const name = (r && (r[0] || r[1])) || fallback || '·';
@@ -372,7 +478,7 @@ let selStation = null; let detailToken = 0;
 async function renderDetail() {
   const d = $('detail'), token = ++detailToken;
   if (selStation) return renderStation(token);
-  if (!selected || !vehicles.has(selected)) { d.style.display = 'none'; return; }
+  if (!selected || !vehicles.has(selected)) { if (selected) select(null); return; }
   const v = vehicles.get(selected), f = feeds.get(v.feed);
   const kmh = v.speed != null ? Math.round(v.speed * 3.6) + ' km/h' : '—';
   const trip = await TT.trip(v.feed, v.trip, v.label);
@@ -380,53 +486,56 @@ async function renderDetail() {
   const tu = TT.delay(v.feed, v.trip, trip && trip.id);
   const rid = trip ? trip.rec[0] : v.route;
   const r = TT.route(v.feed, rid);
-  let html = `<h2>${chip(v.feed, rid, v.route || v.label)} ${ICON[f.type] || ''} ${trip && trip.rec[1] ? '→ ' + trip.rec[1] : (r && r[1]) || v.label}</h2>
-    <div class="sub">${f.name}${r && r[1] && trip && trip.rec[1] ? ' · ' + r[1] : ''}</div>
-    <dl>
-      <dt>Estado</dt><dd>${tu ? delayTxt(tu.delay) : '<span class="muted">sin dato de retraso</span>'}</dd>
-      <dt>Vehículo</dt><dd>${v.label}</dd>
-      <dt>Velocidad</dt><dd>${kmh}</dd>
-      <dt>Dato</dt><dd>${ago(v.ts)}</dd>
-    </dl>
-    <div class="row"><button class="btn ${follow ? 'on' : ''}" id="followBtn">${follow ? '● Siguiendo' : 'Seguir'}</button><button class="btn" id="closeBtn">Cerrar</button></div>`;
+  const dest = trip && trip.rec[1] ? trip.rec[1] : (r && r[1]) || v.label;
+  let html = `<div class="dh"><h2>${chip(v.feed, rid, v.route || v.label)} ${trip && trip.rec[1] ? '→ ' : ''}${dest}</h2><button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div>
+    <div class="sub">${ICON[f.type] || ''} ${f.name}${r && r[1] && trip && trip.rec[1] ? ' · ' + r[1] : ''}</div>
+    <div class="stats">
+      <div class="stat"><small>Estado</small><b>${tu ? delayTxt(tu.delay) : '—'}</b></div>
+      <div class="stat"><small>Velocidad</small><b>${kmh}</b></div>
+      <div class="stat"><small>Posición</small><b>${ago(v.ts).replace('hace ', '')}</b></div>
+    </div>
+    <div class="row"><button class="btn ${follow ? 'on' : ''}" id="followBtn">${follow ? '● Siguiendo' : '◎ Seguir en el mapa'}</button></div>`;
   if (trip) {
     const st = trip.rec[3], now = nowSec(), dl = (tu && tu.delay) || 0;
     let nextIdx = st.findIndex(([, t]) => t + dl >= now); if (nextIdx < 0) nextIdx = st.length;
-    html += `<ul class="tl">` + st.map(([sid, t], i) => {
+    html += `<div class="sect">Paradas</div><ul class="tl">` + st.map(([sid, t], i) => {
       const sd = tu && tu.stops[sid] != null ? tu.stops[sid] : dl;
-      const real = sd ? ` <span class="${sd > 60 ? 'late' : 'ontime'}">${fmtT(t + sd)}</span>` : '';
-      return `<li class="${i < nextIdx ? 'past' : i === nextIdx ? 'next' : ''}" data-stop="${sid}"><span>${TT.stopName(v.feed, sid)}</span><span class="tm">${sd > 60 ? `<s class="muted">${fmtT(t)}</s>` : fmtT(t)}${sd > 60 ? real : ''}</span></li>`;
+      const tm = sd > 60 ? `<s class="muted">${fmtT(t)}</s> <span class="late">${fmtT(t + sd)}</span>` : fmtT(t);
+      return `<li class="${i < nextIdx ? 'past' : i === nextIdx ? 'next' : ''}" data-stop="${sid}"><span>${TT.stopName(v.feed, sid)}</span><span class="tm">${tm}</span></li>`;
     }).join('') + `</ul>`;
-  } else if (f.timetable) html += `<p class="muted" style="margin-top:12px">No encuentro este viaje en los horarios de hoy.</p>`;
-  else html += `<p class="muted" style="margin-top:12px">Este operador no publica horarios abiertos.</p>`;
-  const keep = d.scrollTop; d.style.display = 'block'; d.innerHTML = html; d.scrollTop = keep;
-  $('followBtn').onclick = () => { follow = !follow; if (follow) map.flyTo(v.cur, Math.max(map.getZoom(), 13), { duration: 1.2 }); renderDetail(); };
+  } else html += `<p class="muted" style="margin-top:14px">${f.timetable ? 'No encuentro este viaje en los horarios de hoy.' : 'Este operador no publica horarios abiertos, solo la posición.'}</p>`;
+  const body = $('body'), keep = body.scrollTop; showHome(false); d.innerHTML = html; body.scrollTop = keep;
+  $('followBtn').onclick = () => { follow = !follow; if (follow) { map.setZoom(Math.max(map.getZoom(), 14)); SHEET.set('peek'); } renderDetail(); };
   $('closeBtn').onclick = () => select(null);
   d.querySelectorAll('[data-stop]').forEach(li => li.onclick = () => selectStation(v.feed, li.dataset.stop, true));
-  const nx = d.querySelector('li.next'); if (nx && !d._scrolled) { nx.scrollIntoView({ block: 'center' }); d._scrolled = true; }
+  const nx = d.querySelector('li.next');
+  if (nx && !d._scrolled) { d._scrolled = true; body.scrollTop = Math.max(0, nx.offsetTop - body.clientHeight / 3); }
 }
 async function renderStation(token) {
   const d = $('detail'), { feed: fid, stop: sid } = selStation, f = feeds.get(fid);
   const s = TT.stop(fid, sid);
-  d.style.display = 'block';
-  d.innerHTML = `<h2>🚉 ${s ? s[0] : sid}</h2><div class="sub">${f.name}</div><p class="muted">Cargando salidas…</p>`;
+  const head = `<div class="dh"><h2>🚉 ${s ? s[0] : sid}</h2><button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div><div class="sub">${ICON[f.type] || ''} ${f.name}</div>`;
+  showHome(false);
+  if (!d.dataset.st || d.dataset.st !== fid + sid) { d.innerHTML = head + `<p class="muted">Cargando horarios…</p>`; d.dataset.st = fid + sid; $('closeBtn').onclick = () => select(null); }
   const deps = await TT.departures(fid, sid);
   if (token !== detailToken) return;
   const now = nowSec();
   const live = new Map(); for (const v of vehicles.values()) if (v.feed === fid && v.trip) live.set(v.trip, v.id);
   const list = (deps || []).map(([t, tid, rid, hd]) => { const tu = TT.delay(fid, tid, tid); return { t, tid, rid, hd, d: tu ? tu.delay : null }; })
-    .filter(x => x.t + (x.d || 0) >= now - 60).slice(0, 15);
-  d.innerHTML = `<h2>🚉 ${s ? s[0] : sid}</h2><div class="sub">${f.name} · próximas salidas</div>` +
-    (list.length ? list.map(x => `<div class="dep" data-trip="${x.tid}"><span class="tm">${fmtT(x.t)}</span>${chip(fid, x.rid)}<span class="hd">${x.hd || ''}</span>${x.d != null ? delayTxt(x.d) : ''}${live.has(x.tid) ? '<span class="live-dot" title="En el mapa"></span>' : ''}</div>`).join('')
-      : `<p class="muted">No quedan salidas hoy en los horarios publicados.</p>`) +
-    `<div class="row"><button class="btn" id="closeBtn">Cerrar</button></div>`;
+    .filter(x => x.t + (x.d || 0) >= now - 60).slice(0, 20);
+  const body = $('body'), keep = body.scrollTop;
+  d.innerHTML = head + `<div class="sect">Próximas salidas</div>` +
+    (list.length ? list.map(x => `<div class="dep" data-trip="${x.tid}"><span class="tm">${fmtT(x.t)}</span>${chip(fid, x.rid)}<span class="hd">${x.hd || ''}</span>${x.d != null ? delayTxt(x.d) : ''}${live.has(x.tid) ? '<span class="live-dot" title="Está en el mapa"></span>' : ''}</div>`).join('')
+      : `<p class="muted">${f.timetable ? 'No quedan salidas hoy.' : 'Este operador no publica horarios.'}</p>`) +
+    (list.some(x => live.has(x.tid)) ? `<p class="muted" style="margin-top:10px"><span class="live-dot" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Toca una salida con punto verde para ver el tren en el mapa.</p>` : '');
+  body.scrollTop = keep;
   $('closeBtn').onclick = () => select(null);
-  d.querySelectorAll('[data-trip]').forEach(el => el.onclick = () => { const vid = live.get(el.dataset.trip); if (vid) { select(vid); map.flyTo(vehicles.get(vid).cur, 14, { duration: 1.2 }); } });
+  d.querySelectorAll('[data-trip]').forEach(el => el.onclick = () => { const vid = live.get(el.dataset.trip); if (vid) { select(vid); flyVisible(vehicles.get(vid).cur, 14); } });
 }
 function selectStation(fid, sid, fly) {
-  selected = null; follow = false; selStation = { feed: fid, stop: sid }; $('detail')._scrolled = false;
-  $('side').classList.add('open');
-  const s = TT.stop(fid, sid); if (fly && s) map.flyTo([s[1], s[2]], Math.max(map.getZoom(), 14), { duration: 1.2 });
+  selected = null; follow = false; selStation = { feed: fid, stop: sid }; $('detail')._scrolled = false; $('detail').dataset.st = '';
+  showHome(false); $('body').scrollTop = 0; if (SHEET.state === 'peek') SHEET.set('half');
+  const s = TT.stop(fid, sid); if (fly && s) flyVisible([s[1], s[2]], Math.max(map.getZoom(), 14));
   renderDetail();
 }
 
@@ -473,29 +582,36 @@ function crc32(str) { const b = new TextEncoder().encode(str); let c = 0xFFFFFFF
 
 // búsqueda
 const q = $('q'), results = $('results'); let hits = [], hi = 0;
-q.addEventListener('input', () => {
-  const s = q.value.trim().toLowerCase();
+function doSearch() {
+  const s = q.value.trim().toLowerCase(); $('clear').style.display = s ? 'block' : 'none';
   if (!s) { results.style.display = 'none'; return; }
-  hits = [...vehicles.values()].filter(v => feeds.get(v.feed)?.on && `${v.route} ${v.label} ${v.trip}`.toLowerCase().includes(s)).slice(0, 20);
-  const seenMd = new Set();
+  hits = [];
+  const seenMd = new Set(), seenName = new Set();
   for (const [fid, f] of feeds) { const md = TT.stopsOf(fid); if (!md || !f.on || seenMd.has(md)) continue; seenMd.add(md);
-    for (const sid in md.stops) { if (hits.length > 40) break; if (md.stops[sid][0].toLowerCase().includes(s)) hits.push({ station: true, feed: fid, sid, name: md.stops[sid][0] }); } }
+    for (const sid in md.stops) { if (hits.length >= 15) break; const nm = md.stops[sid][0];
+      if (nm.toLowerCase().includes(s) && !seenName.has(fid + nm)) { seenName.add(fid + nm); hits.push({ station: true, feed: fid, sid, name: nm }); } } }
+  hits.push(...[...vehicles.values()].filter(v => feeds.get(v.feed)?.on && `${v.route} ${v.label} ${v.trip}`.toLowerCase().includes(s)).slice(0, 15));
   hi = 0; drawHits();
-});
-function drawHits() {
-  results.style.display = hits.length ? 'block' : 'none';
-  results.innerHTML = hits.map((v, i) => { const f = feeds.get(v.feed);
-    if (v.station) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">🚉 <b>${v.name}</b> <span style="color:var(--dim)">${f.name}</span></div>`;
-    return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}"><span class="dot" style="color:${f.color}"></span><b>${v.route || ''}</b> <span style="color:var(--dim)">${v.label}</span></div>`; }).join('');
 }
-function go(v) { results.style.display = 'none'; q.blur(); if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); map.flyTo(v.cur || [v.lat, v.lon], 14, { duration: 1.4 }); }
+q.addEventListener('input', doSearch);
+q.addEventListener('focus', () => { if (q.value) doSearch(); });
+function drawHits() {
+  results.style.display = 'block';
+  results.innerHTML = hits.length ? hits.map((v, i) => { const f = feeds.get(v.feed);
+    if (v.station) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">🚉 <b>${v.name}</b><span class="r-sub">${f.name}</span></div>`;
+    return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.route, v.route || '·')} <span>${v.label}</span><span class="r-sub">${f.name}</span></div>`; }).join('')
+    : `<div class="muted">Sin resultados</div>`;
+}
+function go(v) { results.style.display = 'none'; q.blur(); if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
 results.addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) go(hits[+el.dataset.i]); });
 q.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, hits.length - 1); drawHits(); e.preventDefault(); }
   else if (e.key === 'ArrowUp') { hi = Math.max(hi - 1, 0); drawHits(); e.preventDefault(); }
-  else if (e.key === 'Enter' && hits[hi]) go(hits[hi]);
-  else if (e.key === 'Escape') { q.value = ''; results.style.display = 'none'; q.blur(); }
+  else if (e.key === 'Enter') go(hits[hi]);
+  else if (e.key === 'Escape') { q.value = ''; doSearch(); q.blur(); }
 });
+$('clear').onclick = () => { q.value = ''; doSearch(); q.focus(); };
+map.on('click movestart', () => { if (results.style.display === 'block') { results.style.display = 'none'; q.blur(); } });
 document.addEventListener('keydown', e => {
   if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); q.select(); }
   if (e.key === 'Escape' && document.activeElement !== q) select(null);
@@ -503,12 +619,21 @@ document.addEventListener('keydown', e => {
 
 $('theme').onclick = () => {
   theme = theme === 'dark' ? 'light' : 'dark'; tileIdx = 0; tileErrs = 0; tileOk = 0; tiles.setUrl(TILESETS[theme][0].url);
-  document.body.classList.toggle('light', theme === 'light');
+  document.body.classList.toggle('dark', theme === 'dark');
   try { localStorage.setItem('tv-theme', theme); } catch {}
 };
-$('fit').onclick = () => map.flyTo([40.2, -3.7], 6, { duration: 1.2 });
-$('toggle').onclick = () => $('side').classList.toggle('open');
-setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString('es-ES'); }, 1000);
+$('fit').onclick = () => { SHEET.set('peek'); map.flyTo([40.0, -3.7], innerWidth < 600 ? 5 : 6, { duration: 1.2 }); };
+let meMarker = null;
+$('locate').onclick = () => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(p => {
+    const ll = [p.coords.latitude, p.coords.longitude];
+    if (!meMarker) meMarker = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }).addTo(map);
+    else meMarker.setLatLng(ll);
+    SHEET.set('peek'); flyVisible(ll, 14);
+  }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
+};
+if (innerWidth < 600) map.setView([40.0, -3.7], 5);
 setInterval(renderFeeds, 5000);
 </script>
 </body>
