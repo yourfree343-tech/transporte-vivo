@@ -1,0 +1,21 @@
+name: Probar el puente
+on: workflow_dispatch
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          B='https://transporte-vivo.vercel.app/api/proxy?url='
+          for U in \
+            'https://opendata.euskadi.eus/transport/moveuskadi/bizkaibus/gtfsrt_Bizkaibus_vehicle_positions.pb' \
+            'https://opendata.euskadi.eus/transport/moveuskadi/euskotren/gtfsrt_euskotren_vehicle_positions.pb' \
+            'https://opendata.euskadi.eus/transport/moveuskadi/tuvisa/gtfsrt_tuvisa_vehicle_positions.pb' \
+            'https://ctb-gtfs-rt.s3.eu-south-2.amazonaws.com/metro-bilbao-vehicle-positions.pb' \
+            'https://gtfs.emtmalaga.es/GTFSRTapi/api/vehicleposition' \
+            'https://api.control.optibus.co/opendata/v1/gtfs-rt/vehicle-positions?uid=c-5cfcd2d1' \
+            'https://gtfsrt.renfe.com/vehicle_positions_LD.json' ; do
+            E=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$U")
+            echo "== $U"
+            curl -s -o /tmp/d -m 20 -w "  directo: %{http_code} %{time_total}s %{size_download}B\n" "$U"
+            curl -s -o /tmp/p -m 20 -w "  puente : %{http_code} %{time_total}s %{size_download}B\n" "$B$E"; head -c 120 /tmp/p | tr -dc '[:print:]'; echo
+          done
