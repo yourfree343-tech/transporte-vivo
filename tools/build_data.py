@@ -107,7 +107,9 @@ def read_csv(z, name):
     names = {n.split("/")[-1].lower(): n for n in z.namelist()}
     if name not in names: return
     with z.open(names[name]) as f:
-        yield from csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig", errors="replace"))
+        for row in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig", errors="replace")):
+            # Renfe rellena los campos con espacios: se limpian claves y valores
+            yield {(k or "").strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
 
 def active_services(z, day):
     ymd, wd = day.strftime("%Y%m%d"), ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"][day.weekday()]
@@ -232,6 +234,10 @@ def main():
     feeds = [f for f in feeds if f.get("url") or f.get("timetable")]
     dump(os.path.join(OUT, "feeds.json"), feeds)
     log(f"feeds.json con {len(feeds)} operadores")
+    try:
+        m = json.load(open(os.path.join(OUT, "data", "renfe-cercanias", "meta.json"), encoding="utf-8"))
+        log(f"control: Cercanías tiene {len(m['routes'])} líneas en el horario")
+    except Exception: pass
 
 if __name__ == "__main__":
     main()
