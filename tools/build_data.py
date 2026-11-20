@@ -163,7 +163,7 @@ def dump(path, obj):
 def main():
     base = json.load(open(os.path.join(ROOT, "feeds.base.json"), encoding="utf-8"))
     feeds = [f for f in base if f.get("enabled", True)]
-    feeds += discover_euskadi({f["url"] for f in feeds}, feeds)
+    feeds += discover_euskadi({f.get("url") for f in feeds}, feeds)
     os.makedirs(OUT, exist_ok=True)
     for f in feeds:
         if not f.get("gtfs"): continue
