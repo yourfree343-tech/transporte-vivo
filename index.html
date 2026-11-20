@@ -28,6 +28,7 @@
   #map{position:fixed;inset:0;background:var(--bg)}
   .leaflet-container{background:var(--bg);font-family:var(--font)}
   .leaflet-control-attribution{background:rgba(255,255,255,.7)!important;font-size:9px;border-radius:6px 0 0 0}
+  body.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.88) saturate(.6)}
   body.dark .leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#aaa}
   .leaflet-control-zoom{border:0!important;box-shadow:var(--shadow)!important;border-radius:14px!important;overflow:hidden}
   .leaflet-control-zoom a{background:var(--card)!important;color:var(--txt)!important;border-color:var(--line)!important;width:40px!important;height:40px!important;line-height:40px!important}
@@ -163,7 +164,7 @@
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
       <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a>
-        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 2.3 · publicada __BUILD__<span id="verData"></span></div></div>
+        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 2.4 · publicada __BUILD__<span id="verData"></span></div></div>
     </div>
     <div id="detail"></div>
   </div>
@@ -172,24 +173,18 @@
 <script src="vendor/leaflet.js"></script>
 <script src="feeds-client.js"></script>
 <script>
-// mapas: si un proveedor falla, se pasa solo al siguiente
+// mapas: OpenStreetMap siempre; el modo nocturno lo oscurece en el propio navegador (sin depender de otro proveedor)
 const TILESETS = {
-  light: [
-    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
-    { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '© OpenStreetMap · © CARTO' },
-  ],
-  dark: [
-    { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attr: '© OpenStreetMap · © CARTO' },
-    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' },
-  ],
+  light: [{ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' }],
+  dark: [{ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap' }],
 };
 let tileIdx = 0, tileErrs = 0, tileOk = 0;
 const map = L.map('map', { zoomControl: false, preferCanvas: true, worldCopyJump: true }).setView([40.2, -3.7], 6);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 map.attributionControl.setPrefix(false);
-let theme = (() => { try { return localStorage.getItem('tv-theme') || 'light'; } catch { return 'light'; } })();
+let theme =(() => { try { return localStorage.getItem('tv-theme') || 'light'; } catch { return 'light'; } })();
 const TOUCH = matchMedia('(pointer: coarse)').matches;
-const tiles = L.tileLayer(TILESETS[theme][0].url, { maxZoom: 19, subdomains: 'abcd', attribution: TILESETS[theme][0].attr }).addTo(map);
+const tiles = L.tileLayer(TILESETS.light[0].url, { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 tiles.on('tileload', () => tileOk++);
 tiles.on('tileerror', () => {
   if (++tileErrs < 4 || tileOk > 4) return;
@@ -636,7 +631,7 @@ document.addEventListener('keydown', e => {
 });
 
 $('theme').onclick = () => {
-  theme = theme === 'dark' ? 'light' : 'dark'; tileIdx = 0; tileErrs = 0; tileOk = 0; tiles.setUrl(TILESETS[theme][0].url);
+  theme = theme === 'dark' ? 'light' : 'dark';
   document.body.classList.toggle('dark', theme === 'dark');
   try { localStorage.setItem('tv-theme', theme); } catch {}
 };
