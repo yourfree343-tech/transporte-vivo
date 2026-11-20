@@ -7,7 +7,7 @@
   const WALK = 1.1;           // m/s, paso tranquilo
   const CHANGE = 180;         // margen mínimo de transbordo (s)
   const MAX_ROUNDS = 3;       // hasta 2 transbordos
-  const WINDOW = 3 * 3600;    // buscar salidas en las próximas 3 horas
+  const WINDOW = 6 * 3600;    // buscar salidas en las próximas 6 horas
 
   const css = document.createElement('style');
   css.textContent = `
@@ -170,14 +170,16 @@
   }
   async function alternatives(from, to) {
     const out = []; let t = window.__plT0 ?? nowSec(); // __plT0 solo lo usan las pruebas automáticas
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const it = await route(from, to, t); if (!it) break;
       const sig = it.legs.filter(l => l.type === 'ride').map(l => l.tid).join('>');
       if (!out.some(o => o.sig === sig)) out.push({ ...it, sig });
       const firstRide = it.legs.find(l => l.type === 'ride');
       t = firstRide.dep - (it.legs[0].type === 'walk' ? it.legs[0].secs : 0) + 60;
     }
-    return out;
+    // fuera las opciones peores: otra sale igual o más tarde, llega igual o antes y con no más transbordos
+    const good = out.filter(a => !out.some(b => b !== a && b.dep >= a.dep && b.arr <= a.arr && b.rides <= a.rides && (b.dep > a.dep || b.arr < a.arr || b.rides < a.rides)));
+    return good.sort((a, b) => a.dep - b.dep).slice(0, 5);
   }
 
   // ---------- interfaz ----------
