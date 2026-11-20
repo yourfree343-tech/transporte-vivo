@@ -254,6 +254,7 @@ const VehicleLayer = L.Layer.extend({
     }
     for (const v of vehicles.values()) {
       const f = feeds.get(v.feed); if (!f || !f.on) continue;
+      if (HOOKS.showVehicle && v.id !== selected && !HOOKS.showVehicle(v)) continue;
       const k = Math.min(1, (now - v.t0) / v.dur), e = k * (2 - k);
       v.cur = [v.from[0] + (v.to[0] - v.from[0]) * e, v.from[1] + (v.to[1] - v.from[1]) * e];
       const p = m.latLngToContainerPoint(v.cur);
@@ -478,6 +479,7 @@ async function renderDetail() {
   let html = `<div class="dh"><h2>${chip(v.feed, rid, v.route || v.label)} ${trip && trip.rec[1] ? '→ ' : ''}${dest}</h2><button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div>
     <div class="sub">${ICON[f.type] || ''} ${f.name}${r && r[1] && trip && trip.rec[1] ? ' · ' + r[1] : ''}</div>
     ${hook('vehicleExtra', v.feed, rid, v)}
+    ${hook('vehicleLine', v.feed, rid, v, r)}
     <div class="stats">
       <div class="stat"><small>Estado</small><b>${tu ? delayTxt(tu.delay) : '—'}</b></div>
       <div class="stat"><small>Velocidad</small><b>${kmh}</b></div>

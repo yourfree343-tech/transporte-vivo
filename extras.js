@@ -52,7 +52,7 @@
       if (!f.on || f.type === 'bus' || !f.timetable) continue;
       const src = f.timetable.source || fid; if (drawn.has(src)) continue; drawn.add(src);
       const lines = await loadLines(fid); if (!lines || !f.on) continue;
-      for (const rid in lines) L.polyline(lines[rid], { renderer: lineRenderer, color: routeColor(fid, rid), weight: f.type === 'alta-velocidad' ? 2 : 3, opacity: f.type === 'alta-velocidad' ? 0.35 : 0.55, interactive: false }).addTo(netLayer);
+      for (const rid in lines) if (!(onlyFav && FAVL.length) || isFavLine(`${fid}|${rid}`)) L.polyline(lines[rid], { renderer: lineRenderer, color: routeColor(fid, rid), weight: f.type === 'alta-velocidad' ? 2 : 3, opacity: f.type === 'alta-velocidad' ? 0.35 : 0.55, interactive: false }).addTo(netLayer);
     }
   }
   let hiKey = '';
@@ -68,7 +68,7 @@
   // redibujar la red cuando cambian filtros o llegan horarios
   let netSig = '';
   setInterval(() => {
-    const sig = [...feeds.values()].map(f => f.on ? 1 : 0).join('') + ':' + [...feeds.keys()].filter(k => TT.stopsOf(k)).length;
+    const sig = [...feeds.values()].map(f => f.on ? 1 : 0).join('') + ':' + [...feeds.keys()].filter(k => TT.stopsOf(k)).length + ':' + onlyFav + FAVL.map(x => x.k).join(',');
     if (sig !== netSig) { netSig = sig; drawNetwork(); }
   }, 1500);
 
@@ -217,6 +217,58 @@
     if (gf && selStation) gf.onclick = () => { const s = TT.stop(selStation.feed, selStation.stop); const e = stationIndex().get((s ? s[0] : '').toLowerCase()); openPlanner(e || null); };
   };
   HOOKS.home = () => { clearHi(); renderFavs(); };
+
+  // ======================= LÍNEAS FAVORITAS =======================
+  // clave de línea: operador + id de línea del horario oficial (o, si el operador no publica horarios, la línea que da el tiempo real)
+  const lineKey = (fid, rid, v) => rid != null ? `${fid}|${rid}` : (v && v.route ? `${fid}|~${v.route}` : null);
+  const loadFL = () => { try { return JSON.parse(localStorage.getItem('tv-favlines') || '[]'); } catch { return []; } };
+  let FAVL = loadFL();
+  let onlyFav = (() => { try { return localStorage.getItem('tv-onlyfav') === '1'; } catch { return false; } })();
+  const saveFL = () => { try { localStorage.setItem('tv-favlines', JSON.stringify(FAVL)); localStorage.setItem('tv-onlyfav', onlyFav ? '1' : '0'); } catch {} };
+  const isFavLine = k => FAVL.some(x => x.k === k);
+  // averigua en segundo plano la línea oficial de cada vehículo (a partir de su viaje en el horario)
+  async function resolveLines() {
+    let n = 0;
+    for (const v of vehicles.values()) {
+      if (v._rt === (v.trip || v.label)) continue;
+      if (!TT.stopsOf(v.feed)) { if (!feeds.get(v.feed)?.timetable) { v._rt = v.trip || v.label; v.rid = null; } continue; }
+      v._rt = v.trip || v.label;
+      const tr = await TT.trip(v.feed, v.trip, v.label).catch(() => null);
+      v.rid = tr ? tr.rec[0] : null;
+      if (++n >= 60) break;
+    }
+  }
+  setInterval(resolveLines, 1500);
+  HOOKS.showVehicle = v => {
+    if (!onlyFav || !FAVL.length) return true;
+    return isFavLine(lineKey(v.feed, v.rid, v));
+  };
+  HOOKS.vehicleLine = (fid, rid, v, r) => {
+    const k = lineKey(fid, rid, v); if (!k) return '';
+    if (rid != null) v.rid = rid;
+    const on = isFavLine(k);
+    const name = (r && (r[0] || r[1])) || v.route || '';
+    return `<button class="btn favline ${on ? 'on' : ''}" data-k="${esc(k)}" data-n="${esc(name)}" data-l="${esc(r && r[1] ? r[1] : '')}" style="margin-bottom:8px;width:100%;flex:none">${on ? '⭐ Línea en favoritas' : '☆ Añadir línea ' + esc(name) + ' a favoritas'}</button>`;
+  };
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.favline'); if (!b) return;
+    const k = b.dataset.k, fid = k.split('|')[0];
+    if (isFavLine(k)) FAVL = FAVL.filter(x => x.k !== k);
+    else FAVL.push({ k, feed: fid, name: b.dataset.n, long: b.dataset.l, color: (TT.route(fid, k.split('|')[1]) || [])[2] || feeds.get(fid)?.color });
+    saveFL(); renderFavLines(); renderDetail();
+  });
+  function renderFavLines() {
+    let box = $('favlines');
+    if (!box) { box = document.createElement('div'); box.id = 'favlines'; $('favs').before(box); }
+    if (!FAVL.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="sect">Tus líneas</div>
+      <div class="feed ${onlyFav ? 'on' : ''}" id="onlyFavRow"><span class="ic" style="background:rgba(245,158,11,.18)">⭐</span><div class="nm">Ver solo mis líneas<em>${onlyFav ? 'El mapa solo muestra tus líneas' : 'El mapa muestra todo'}</em></div><span class="sw"></span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px">${FAVL.map(x => `<span class="chip" style="background:${x.color || '#666'};padding:6px 10px;font-size:14px" title="${esc(x.long)}">${esc(x.name)} <span data-del="${esc(x.k)}" style="margin-left:6px;opacity:.8;cursor:pointer">✕</span></span>`).join('')}</div>
+      <div class="muted" style="font-size:12px">Para añadir una línea, toca un vehículo y pulsa ☆.</div>`;
+    $('onlyFavRow').onclick = () => { onlyFav = !onlyFav; saveFL(); renderFavLines(); };
+    box.querySelectorAll('[data-del]').forEach(el => el.onclick = e => { e.stopPropagation(); FAVL = FAVL.filter(x => x.k !== el.dataset.del); if (!FAVL.length) onlyFav = false; saveFL(); renderFavLines(); });
+  }
+  renderFavLines();
 
   // ======================= INSTALAR COMO APP =======================
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
