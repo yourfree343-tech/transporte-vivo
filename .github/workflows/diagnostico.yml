@@ -1,0 +1,35 @@
+name: Diagnóstico en navegador real
+on: workflow_dispatch
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i playwright@1 && npx playwright install --with-deps chromium
+      - name: Abrir la web como un móvil
+        run: |
+          cat > t.mjs <<'JS'
+          import { chromium, devices } from 'playwright';
+          const b = await chromium.launch();
+          const ctx = await b.newContext({ ...devices['iPhone 13'] });
+          const pg = await ctx.newPage();
+          pg.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('CONSOLA', m.type(), m.text().slice(0, 300)); });
+          pg.on('pageerror', e => console.log('ERROR JS', e.message));
+          pg.on('requestfailed', r => console.log('FALLO RED', r.url().slice(0, 160), r.failure()?.errorText));
+          pg.on('response', r => { if (r.url().includes('/data/') || r.url().includes('feeds')) console.log('RESP', r.status(), r.url().slice(0, 160)); });
+          await pg.goto('https://yourfree343-tech.github.io/transporte-vivo/?t=' + Date.now(), { waitUntil: 'load' });
+          for (const s of [5, 15, 30]) {
+            await pg.waitForTimeout(s === 5 ? 5000 : 10000);
+            console.log(`--- ${s}s`, JSON.stringify(await pg.evaluate(() => ({
+              feeds: feeds.size, vehicles: vehicles.size,
+              metas: [...feeds.keys()].filter(k => TT.stopsOf(k)).length,
+              conHorario: [...feeds.values()].filter(f => f.timetable).length,
+              errores: [...feeds.values()].filter(f => f.status && f.status.ok === false).map(f => f.id + ': ' + f.status.error),
+            }))));
+          }
+          await pg.tap('#q'); await pg.keyboard.type('Garena'); await pg.waitForTimeout(1500);
+          console.log('BUSQUEDA', JSON.stringify(await pg.evaluate(() => document.getElementById('results').innerText.slice(0, 300))));
+          await b.close();
+          JS
+          node t.mjs
