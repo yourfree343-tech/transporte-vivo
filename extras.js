@@ -120,7 +120,7 @@
   }
   $('favs').addEventListener('click', e => { const c = e.target.closest('.fav'); if (c) selectStation(c.dataset.f, c.dataset.s, true); });
   setInterval(() => { if ($('home').style.display !== 'none') renderFavs(); }, 30000);
-  setTimeout(renderFavs, 2500); setTimeout(renderFavs, 6000);
+  let favT = null; addEventListener('tt-meta', () => { clearTimeout(favT); favT = setTimeout(() => { if ($('home').style.display !== 'none') renderFavs(); }, 400); });
 
   // ======================= ACCIONES DE INICIO =======================
   function renderActions() {

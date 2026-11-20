@@ -541,7 +541,7 @@ const TT = (() => {
   return {
     init(list) {
       for (const f of list) {
-        if (f.timetable) { const src = f.timetable.source || f.id; json(`data/${src}/meta.json`).then(m => { m.src = src; meta.set(f.id, m); }).catch(() => {}); }
+        if (f.timetable) { const src = f.timetable.source || f.id; json(`data/${src}/meta.json`).then(m => { m.src = src; meta.set(f.id, m); dispatchEvent(new Event('tt-meta')); }).catch(() => {}); }
         if (f.tripUpdates) {
           const tick = () => FeedsClient.tripUpdates(f).then(m => { delays.set(f.id, m); if (selected || selStation) renderDetail(); }).catch(() => {}).finally(() => setTimeout(tick, 30000));
           setTimeout(tick, 1500);
@@ -588,6 +588,9 @@ function doSearch() {
   hi = 0; drawHits(seenMd.size === 0);
 }
 q.addEventListener('input', doSearch);
+// cuando terminan de llegar estaciones, se actualiza la búsqueda que esté abierta
+let ttTimer = null;
+addEventListener('tt-meta', () => { clearTimeout(ttTimer); ttTimer = setTimeout(() => { if (q.value.trim() && results.style.display === 'block') doSearch(); }, 250); });
 q.addEventListener('focus', () => { document.body.classList.add('searching'); setTimeout(() => q.select(), 0); if (q.value) doSearch(); });
 q.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== q) document.body.classList.remove('searching'); }, 250));
 function drawHits(loading) {
@@ -595,7 +598,7 @@ function drawHits(loading) {
   results.innerHTML = hits.length ? hits.map((v, i) => { const f = feeds.get(v.feed);
     if (v.station) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">🚉 <b>${v.name}</b><span class="r-sub">${f.name}</span></div>`;
     return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.route, v.route || '·')} <span>${v.label}</span><span class="r-sub">${f.name}</span></div>`; }).join('')
-    : `<div class="muted">${loading ? 'Cargando estaciones… prueba en unos segundos' : 'Sin resultados'}</div>`;
+    : `<div class="muted">${loading ? 'Cargando estaciones…' : 'Sin resultados'}</div>`;
 }
 function go(v) { results.style.display = 'none'; document.body.classList.remove('searching'); q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
 results.addEventListener('pointerdown', e => e.preventDefault());
