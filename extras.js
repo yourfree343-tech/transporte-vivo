@@ -291,6 +291,60 @@
   renderFavLines();
   renderActions();
 
+  // ======================= BUSCAR LÍNEAS =======================
+  function lineIndex() {
+    const idx = new Map(), seen = new Set();
+    for (const [fid, f] of feeds) {
+      const md = TT.stopsOf(fid); if (!md || seen.has(md)) continue; seen.add(md);
+      for (const rid in md.routes) {
+        const r = md.routes[rid], k = lineKey(fid, rid); if (!k) continue;
+        if (!idx.has(k)) { const t = document.createElement('div'); t.innerHTML = chip(fid, rid, r[0]); idx.set(k, { line: true, k, feed: fid, name: r[0] || r[1], longs: new Set(), rids: [], color: t.firstChild.style.background }); }
+        const e = idx.get(k); e.rids.push(rid); if (r[1]) e.longs.add(r[1]);
+      }
+    }
+    for (const e of idx.values()) {
+      // nombre del recorrido sin repetir el sentido contrario: "A - B" y "B - A" → "A ⇄ B"
+      const L = [...e.longs], out = [];
+      for (const l of L) { const p = l.split(' - '); const rev = p.slice().reverse().join(' - '); if (!out.some(o => o.raw === rev)) out.push({ raw: l, txt: p.length === 2 ? p.join(' ⇄ ') : l }); }
+      e.long = out.map(o => o.txt).slice(0, 2).join(' · ');
+    }
+    return idx;
+  }
+  HOOKS.searchLines = (words, match) => {
+    const live = new Map(); for (const v of vehicles.values()) { const k = lineKey(v.feed, v.rid, v); if (k) live.set(k, (live.get(k) || 0) + 1); }
+    const q = words.join(' ');
+    return [...lineIndex().values()].filter(e => match(`${e.name} ${e.long}`))
+      .map(e => ({ ...e, live: live.get(e.k) || 0, score: (e.name.toLowerCase() === q ? 0 : 1) }))
+      .sort((a, b) => a.score - b.score || b.live - a.live).slice(0, 12);
+  };
+  HOOKS.openLine = e => {
+    selected = null; selStation = null; follow = false;
+    showHome(false); $('body').scrollTop = 0; if (SHEET.state === 'peek') SHEET.set('half');
+    hiKey = 'line:' + e.k; hiLayer.clearLayers();
+    loadLines(e.feed).then(lines => {
+      if (!lines || hiKey !== 'line:' + e.k) return;
+      const all = [];
+      for (const rid of e.rids) if (lines[rid]) {
+        L.polyline(lines[rid], { renderer: lineRenderer, color: '#fff', weight: 9, opacity: .9, interactive: false }).addTo(hiLayer);
+        L.polyline(lines[rid], { renderer: lineRenderer, color: e.color, weight: 5, interactive: false }).addTo(hiLayer);
+        all.push(...lines[rid]);
+      }
+      if (all.length) map.fitBounds(L.latLngBounds(all), { paddingTopLeft: [20, 90], paddingBottomRight: [20, SHEET.visible() + 20], maxZoom: 13 });
+    });
+    const vs = [...vehicles.values()].filter(v => lineKey(v.feed, v.rid, v) === e.k);
+    const on = isFavLine(e.k);
+    const d = $('detail');
+    d.innerHTML = `<div class="dh"><h2><span class="chip" style="background:${e.color}">${esc(e.name)}</span> ${esc(e.long)}</h2><button class="x" id="closeBtn">✕</button></div>
+      <div class="sub">${ICON[feeds.get(e.feed).type] || ''} ${esc(feeds.get(e.feed).name)}</div>
+      <button class="btn favline ${on ? 'on' : ''}" data-k="${esc(e.k)}" data-c="${esc(e.color)}" data-n="${esc(e.name)}" data-l="${esc(e.long)}" style="margin-bottom:8px;width:100%;flex:none">${on ? '⭐ Línea en favoritas' : '☆ Añadir línea ' + esc(e.name) + ' a favoritas'}</button>
+      ${alertsFor(e.feed).filter(a => a.routes.some(r => lineKey(e.feed, r) === e.k)).slice(0, 3).map(alertHTML).join('')}
+      <div class="sect">En circulación ahora · ${vs.length}</div>` +
+      (vs.length ? vs.map(v => `<div class="dep" data-v="${v.id}"><span class="tm">${esc((String(v.label).match(/\d{4,6}/) || [''])[0])}</span><span class="hd">${(() => { const r = TT.route(v.feed, v.rid); return esc(r && r[1] ? r[1] : v.label); })()}</span><span class="live-dot"></span></div>`).join('')
+        : '<p class="muted">Ahora mismo no hay vehículos de esta línea en directo.</p>');
+    $('closeBtn').onclick = () => select(null);
+    d.querySelectorAll('[data-v]').forEach(el => el.onclick = () => { select(el.dataset.v); flyVisible(vehicles.get(el.dataset.v).cur, 14); });
+  };
+
   // ======================= INSTALAR COMO APP =======================
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;

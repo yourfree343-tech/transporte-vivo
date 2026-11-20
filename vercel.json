@@ -1,1 +1,8 @@
-{ "regions": ["cdg1"], "functions": { "api/proxy.js": { "maxDuration": 15 } } }
+{
+  "regions": ["cdg1"],
+  "functions": { "api/proxy.js": { "maxDuration": 15 } },
+  "redirects": [
+    { "source": "/", "destination": "https://yourfree343-tech.github.io/transporte-vivo/", "permanent": false },
+    { "source": "/((?!api/).*)", "destination": "https://yourfree343-tech.github.io/transporte-vivo/$1", "permanent": false }
+  ]
+}

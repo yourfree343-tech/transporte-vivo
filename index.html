@@ -163,7 +163,7 @@
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
       <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a>
-        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 1.9 · publicada __BUILD__<span id="verData"></span></div></div>
+        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 2.0 · publicada __BUILD__<span id="verData"></span></div></div>
     </div>
     <div id="detail"></div>
   </div>
@@ -600,6 +600,7 @@ function doSearch() {
       if (match(nm) && !seenName.has(fid + nm)) { seenName.add(fid + nm); st.push({ station: true, feed: fid, sid, name: nm, score: fold(nm).indexOf(words[0]) }); } } }
   st.sort((x, y) => (x.score - y.score) || x.name.length - y.name.length);
   hits.push(...st.slice(0, 25));
+  hits.push(...(HOOKS.searchLines ? HOOKS.searchLines(words, match) : []));
   hits.push(...[...vehicles.values()].filter(v => match(`${v.route} ${v.label} ${v.trip}`)).slice(0, 15));
   hi = 0; drawHits(seenMd.size === 0);
 }
@@ -613,10 +614,12 @@ function drawHits(loading) {
   results.style.display = 'block';
   results.innerHTML = hits.length ? hits.map((v, i) => { const f = feeds.get(v.feed);
     if (v.station) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">🚉 <b>${v.name}</b><span class="r-sub">${f.name}</span></div>`;
-    return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.route, v.route || '·')} <span>${v.label}</span><span class="r-sub">${f.name}</span></div>`; }).join('')
+    if (v.line) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} <span class="chip" style="background:${v.color}">${v.name}</span><span style="flex:1;min-width:0">${v.long}</span><span class="r-sub">${v.live ? v.live + ' en directo' : 'Línea'}</span></div>`;
+    const r = v.rid != null ? TT.route(v.feed, v.rid) : null;
+    return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.rid ?? v.route, v.route || '·')} <span style="flex:1;min-width:0">${r && r[1] ? r[1] : v.label}</span><span class="r-sub">${r ? 'Tren ' + (String(v.label).match(/\d{4,6}/) || [v.label])[0] : f.name}</span></div>`; }).join('')
     : `<div class="muted">${loading ? 'Cargando estaciones…' : 'Sin resultados'}</div>`;
 }
-function go(v) { results.style.display = 'none'; document.body.classList.remove('searching'); q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
+function go(v) { results.style.display = 'none'; document.body.classList.remove('searching'); q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); if (v.line) return HOOKS.openLine(v); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
 results.addEventListener('pointerdown', e => e.preventDefault());
 results.addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) go(hits[+el.dataset.i]); });
 q.addEventListener('keydown', e => {

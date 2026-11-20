@@ -5,6 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
+          echo "== redirección"; curl -s -o /dev/null -w "  raiz vercel: %{http_code} -> %{redirect_url}\n" https://transporte-vivo.vercel.app/
           B='https://transporte-vivo.vercel.app/api/proxy?url='
           for U in \
             'https://opendata.euskadi.eus/transport/moveuskadi/bizkaibus/gtfsrt_Bizkaibus_vehicle_positions.pb' \
