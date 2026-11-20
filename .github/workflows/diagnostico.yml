@@ -6,15 +6,16 @@ jobs:
     steps:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm i playwright@1 && npx playwright install --with-deps chromium
+      - run: npm i playwright@1 && npx playwright install --with-deps chromium webkit
       - name: Abrir la web como un móvil
         run: |
           cat > t.mjs <<'JS'
-          import { chromium, devices } from 'playwright';
-          const b = await chromium.launch();
+          import { chromium, webkit, devices } from 'playwright';
+          const motor = process.env.MOTOR === 'webkit' ? webkit : chromium; console.log('MOTOR', process.env.MOTOR || 'chromium');
+          const b = await motor.launch();
           const ctx = await b.newContext({ ...devices['iPhone 13'] });
           const pg = await ctx.newPage();
-          const cdp = await ctx.newCDPSession(pg); await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.5e6 / 8 * 4, uploadThroughput: 750e3 / 8 });
+          if (process.env.MOTOR !== 'webkit') { const cdp = await ctx.newCDPSession(pg); await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1.5e6 / 8 * 4, uploadThroughput: 750e3 / 8 }); }
           pg.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.log('CONSOLA', m.type(), m.text().slice(0, 300)); });
           pg.on('pageerror', e => console.log('ERROR JS', e.message));
           pg.on('requestfailed', r => console.log('FALLO RED', r.url().slice(0, 160), r.failure()?.errorText));
@@ -36,10 +37,16 @@ jobs:
             const f = feeds.get('renfe-cercanias'); const al = await FeedsClient.alerts(f);
             const rids = [...new Set(al.flatMap(a => a.routes))];
             const ok = rids.filter(r => TT.route('renfe-cercanias', r));
-            return { avisos: al.length, codigosLinea: rids.length, encontradosEnHorario: ok.length, ejemplosNo: rids.filter(r => !TT.route('renfe-cercanias', r)).slice(0, 5), ejemploSi: ok.slice(0, 3).map(r => [r, TT.route('renfe-cercanias', r)]), rutasHorario: Object.entries(TT.stopsOf('renfe-cercanias').routes).filter(([k, v]) => /^C[24]/.test(v[0]) || k.includes('C2')).slice(0, 12), totalRutas: Object.keys(TT.stopsOf('renfe-cercanias').routes).length, viajeEj: (vehicles.values().find(v => v.feed === 'renfe-cercanias') || {}).trip, conHorarioResuelto: await (async () => { const vs = [...vehicles.values()].filter(v => v.feed === 'renfe-cercanias').slice(0, 40); let n = 0; for (const v of vs) if (await TT.trip(v.feed, v.trip, v.label)) n++; return n + ' de ' + vs.length; })(), ldResuelto: await (async () => { const vs = [...vehicles.values()].filter(v => v.feed === 'renfe-ld').slice(0, 40); let n = 0; for (const v of vs) if (await TT.trip(v.feed, v.trip, v.label)) n++; return n + ' de ' + vs.length; })() };
+            return { avisos: al.length, codigosLinea: rids.length, encontradosEnHorario: ok.length, ejemplosNo: rids.filter(r => !TT.route('renfe-cercanias', r)).slice(0, 5), ejemploSi: ok.slice(0, 3).map(r => [r, TT.route('renfe-cercanias', r)]), rutasHorario: Object.entries(TT.stopsOf('renfe-cercanias').routes).filter(([k, v]) => /^C[24]/.test(v[0]) || k.includes('C2')).slice(0, 12), totalRutas: Object.keys(TT.stopsOf('renfe-cercanias').routes).length, viajeEj: ([...vehicles.values()].find(v => v.feed === 'renfe-cercanias') || {}).trip, conHorarioResuelto: await (async () => { const vs = [...vehicles.values()].filter(v => v.feed === 'renfe-cercanias').slice(0, 40); let n = 0; for (const v of vs) if (await TT.trip(v.feed, v.trip, v.label)) n++; return n + ' de ' + vs.length; })(), ldResuelto: await (async () => { const vs = [...vehicles.values()].filter(v => v.feed === 'renfe-ld').slice(0, 40); let n = 0; for (const v of vs) if (await TT.trip(v.feed, v.trip, v.label)) n++; return n + ' de ' + vs.length; })() };
           })));
           await pg.tap('#q'); await pg.keyboard.type('Garena'); await pg.waitForTimeout(1500);
           console.log('BUSQUEDA', JSON.stringify(await pg.evaluate(() => document.getElementById('results').innerText.slice(0, 300))));
+          await pg.evaluate(() => map.setView([40.4065, -3.6895], 14)); await pg.waitForTimeout(3000);
+          console.log('ESTACIONES EN PANTALLA', await pg.evaluate(() => (layer._st || []).length));
+          await pg.screenshot({ path: 'captura-' + (process.env.MOTOR || 'chromium') + '.png' });
           await b.close();
           JS
           node t.mjs
+          MOTOR=webkit node t.mjs
+      - uses: actions/upload-artifact@v4
+        with: { name: capturas, path: 'captura-*.png' }
