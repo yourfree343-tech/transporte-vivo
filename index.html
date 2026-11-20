@@ -461,7 +461,9 @@ function delayTxt(d) { if (d == null) return ''; const m = Math.round(d / 60); r
 function chip(feedId, rid, fallback) {
   const r = TT.route(feedId, rid), f = feeds.get(feedId);
   const name = (r && (r[0] || r[1])) || fallback || '·';
-  return `<span class="chip" style="background:${(r && r[2]) || f.color}">${name}</span>`;
+  let col = (r && r[2]) || f.color;
+  const h = /^#?([0-9a-f]{6})$/i.exec(col || ''); if (h) { const n = parseInt(h[1], 16), lum = (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; if (lum > 0.8) col = f.color; }
+  return `<span class="chip" style="background:${col}">${name}</span>`;
 }
 let selStation = null; let detailToken = 0;
 async function renderDetail() {

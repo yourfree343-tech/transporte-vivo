@@ -52,7 +52,7 @@
       if (!f.on || f.type === 'bus' || !f.timetable) continue;
       const src = f.timetable.source || fid; if (drawn.has(src)) continue; drawn.add(src);
       const lines = await loadLines(fid); if (!lines || !f.on) continue;
-      for (const rid in lines) if (!(onlyFav && FAVL.length) || isFavLine(`${fid}|${rid}`)) L.polyline(lines[rid], { renderer: lineRenderer, color: routeColor(fid, rid), weight: f.type === 'alta-velocidad' ? 2 : 3, opacity: f.type === 'alta-velocidad' ? 0.35 : 0.55, interactive: false }).addTo(netLayer);
+      for (const rid in lines) if (!(onlyFav && FAVL.length) || isFavLine(lineKey(fid, rid))) L.polyline(lines[rid], { renderer: lineRenderer, color: routeColor(fid, rid), weight: f.type === 'alta-velocidad' ? 2 : 3, opacity: f.type === 'alta-velocidad' ? 0.35 : 0.55, interactive: false }).addTo(netLayer);
     }
   }
   let hiKey = '';
@@ -83,6 +83,10 @@
     ALERTS = all; renderActions();
   }
   setTimeout(pollAlerts, 2500); setInterval(pollAlerts, 120000);
+  let alertFav = (() => { try { return localStorage.getItem('tv-alertfav') !== '0'; } catch { return true; } })();
+  const hasFavs = () => FAVL.length > 0 || FAVS.length > 0;
+  const alertIsMine = a => a.routes.some(r => isFavLine(lineKey(a.feed, r))) || a.stops.some(sid => FAVS.some(x => x.feed === a.feed && x.sid === sid));
+  const visibleAlerts = () => (alertFav && hasFavs()) ? ALERTS.filter(alertIsMine) : ALERTS;
   const alertsFor = (fid, rid, sid) => ALERTS.filter(a => a.feed === fid && ((rid && a.routes.includes(rid)) || (sid && a.stops.includes(sid))));
   const alertHTML = a => {
     const chips = [...new Set(a.routes)].slice(0, 8).map(r => chip(a.feed, r)).join('');
@@ -93,11 +97,14 @@
     selected = null; selStation = null; follow = false; clearHi();
     showHome(false); $('body').scrollTop = 0; if (SHEET.state !== 'full') SHEET.set('full');
     const d = $('detail');
+    const list = visibleAlerts();
     const groups = {};
-    for (const a of ALERTS) { const tag = (a.text.match(/^#(\w+)/) || [, 'Renfe'])[1].replace(/^(Mad|Bcn|Rod|Val|Sev|Mal|Bil|Ast|San|Mur|Zar|Cad|Sss)(.*)$/i, (m, x) => ({ mad: 'Madrid', bcn: 'Barcelona', rod: 'Rodalies', val: 'Valencia', sev: 'Sevilla', mal: 'Málaga', bil: 'Bilbao', ast: 'Asturias', san: 'Santander', mur: 'Murcia', zar: 'Zaragoza', cad: 'Cádiz', sss: 'San Sebastián' })[x.toLowerCase()] || x); (groups[tag] = groups[tag] || []).push(a); }
-    d.innerHTML = `<div class="dh"><h2>⚠️ Avisos (${ALERTS.length})</h2><button class="x" id="closeBtn">✕</button></div><div class="sub">Incidencias y cambios de servicio publicados por Renfe</div>` +
-      (ALERTS.length ? Object.keys(groups).sort().map(g => `<div class="sect">${esc(g)} · ${groups[g].length}</div>` + groups[g].map(alertHTML).join('')).join('') : '<p class="muted">No hay avisos ahora mismo.</p>');
+    for (const a of list) { const tag = (a.text.match(/^#(\w+)/) || [, 'Renfe'])[1].replace(/^(Mad|Bcn|Rod|Val|Sev|Mal|Bil|Ast|San|Mur|Zar|Cad|Sss)(.*)$/i, (m, x) => ({ mad: 'Madrid', bcn: 'Barcelona', rod: 'Rodalies', val: 'Valencia', sev: 'Sevilla', mal: 'Málaga', bil: 'Bilbao', ast: 'Asturias', san: 'Santander', mur: 'Murcia', zar: 'Zaragoza', cad: 'Cádiz', sss: 'San Sebastián' })[x.toLowerCase()] || x); (groups[tag] = groups[tag] || []).push(a); }
+    const toggle = hasFavs() ? `<div class="feed ${alertFav ? 'on' : ''}" id="alertFavRow"><span class="ic" style="background:rgba(245,158,11,.18)">⭐</span><div class="nm">Solo mis favoritas<em>${alertFav ? `Avisos de tus líneas y estaciones (${list.length} de ${ALERTS.length})` : `Todos los avisos (${ALERTS.length})`}</em></div><span class="sw"></span></div>` : `<p class="muted">Guarda líneas o estaciones como favoritas para ver solo sus avisos.</p>`;
+    d.innerHTML = `<div class="dh"><h2>⚠️ Avisos (${list.length})</h2><button class="x" id="closeBtn">✕</button></div><div class="sub">Incidencias y cambios de servicio publicados por Renfe</div>` + toggle +
+      (list.length ? Object.keys(groups).sort().map(g => `<div class="sect">${esc(g)} · ${groups[g].length}</div>` + groups[g].map(alertHTML).join('')).join('') : `<p class="muted">${alertFav && hasFavs() ? 'Ningún aviso afecta ahora a tus líneas ni estaciones favoritas. 👍' : 'No hay avisos ahora mismo.'}</p>`);
     $('closeBtn').onclick = () => select(null);
+    const tr = $('alertFavRow'); if (tr) tr.onclick = () => { alertFav = !alertFav; try { localStorage.setItem('tv-alertfav', alertFav ? '1' : '0'); } catch {} renderActions(); openAlerts(); };
   }
 
   // ======================= FAVORITAS =======================
@@ -124,13 +131,12 @@
 
   // ======================= ACCIONES DE INICIO =======================
   function renderActions() {
-    const n = ALERTS.length;
+    const n = visibleAlerts().length, mine = alertFav && hasFavs();
     $('actions').innerHTML = `<button class="act" id="planBtn"><span>🧭</span><div>Cómo llegar<b>Trenes directos</b></div></button>` +
-      `<button class="act ${n ? 'warn' : ''}" id="alertBtn"><span>⚠️</span><div>Avisos<b>${n ? n + ' activos' : 'Sin avisos'}</b></div></button>`;
+      `<button class="act ${n ? 'warn' : ''}" id="alertBtn"><span>⚠️</span><div>Avisos<b>${n ? n + (mine ? ' en tus favoritas' : ' activos') : (mine ? 'Nada en tus favoritas' : 'Sin avisos')}</b></div></button>`;
     $('planBtn').onclick = () => openPlanner();
     $('alertBtn').onclick = openAlerts;
   }
-  renderActions();
 
   // ======================= CÓMO LLEGAR (A → B) =======================
   let plan = { from: null, to: null }; // {name, refs:[[fid,sid]]}
@@ -211,7 +217,7 @@
     if (fb && selStation) fb.onclick = () => {
       const { feed, stop } = selStation, s = TT.stop(feed, stop);
       if (isFav(feed, stop)) FAVS = FAVS.filter(x => !(x.feed === feed && x.sid === stop)); else FAVS.push({ feed, sid: stop, name: s ? s[0] : stop });
-      saveFavs(); fb.classList.toggle('on', isFav(feed, stop)); fb.textContent = isFav(feed, stop) ? '⭐' : '☆'; renderFavs();
+      saveFavs(); fb.classList.toggle('on', isFav(feed, stop)); fb.textContent = isFav(feed, stop) ? '⭐' : '☆'; renderFavs(); renderActions();
     };
     const gf = d.querySelector('#goFrom');
     if (gf && selStation) gf.onclick = () => { const s = TT.stop(selStation.feed, selStation.stop); const e = stationIndex().get((s ? s[0] : '').toLowerCase()); openPlanner(e || null); };
@@ -220,12 +226,24 @@
 
   // ======================= LÍNEAS FAVORITAS =======================
   // clave de línea: operador + id de línea del horario oficial (o, si el operador no publica horarios, la línea que da el tiempo real)
-  const lineKey = (fid, rid, v) => rid != null ? `${fid}|${rid}` : (v && v.route ? `${fid}|~${v.route}` : null);
+  const lineKey = (fid, rid, v) => {
+    if (rid != null) {
+      const r = TT.route(fid, rid); if (!r) return null;
+      const grp = /^\d{2}T/.test(rid) ? rid.slice(0, 2) : '';
+      return `${fid}|${grp}|${r[0] || r[1]}`;
+    }
+    return v && v.route ? `${fid}||${v.route}` : null;
+  };
   const loadFL = () => { try { return JSON.parse(localStorage.getItem('tv-favlines') || '[]'); } catch { return []; } };
   let FAVL = loadFL();
   let onlyFav = (() => { try { return localStorage.getItem('tv-onlyfav') === '1'; } catch { return false; } })();
   const saveFL = () => { try { localStorage.setItem('tv-favlines', JSON.stringify(FAVL)); localStorage.setItem('tv-onlyfav', onlyFav ? '1' : '0'); } catch {} };
   const isFavLine = k => FAVL.some(x => x.k === k);
+  addEventListener('tt-meta', () => {
+    let ch = false;
+    FAVL = FAVL.map(x => { const p = x.k.split('|'); if (p.length !== 2) return x; const nk = p[1].startsWith('~') ? `${p[0]}||${p[1].slice(1)}` : lineKey(p[0], p[1]); if (!nk) return x; ch = true; return { ...x, k: nk }; });
+    if (ch) { const seen = new Set(); FAVL = FAVL.filter(x => !seen.has(x.k) && seen.add(x.k)); saveFL(); renderFavLines(); }
+  });
   // averigua en segundo plano la línea oficial de cada vehículo (a partir de su viaje en el horario)
   async function resolveLines() {
     let n = 0;
@@ -248,14 +266,15 @@
     if (rid != null) v.rid = rid;
     const on = isFavLine(k);
     const name = (r && (r[0] || r[1])) || v.route || '';
-    return `<button class="btn favline ${on ? 'on' : ''}" data-k="${esc(k)}" data-n="${esc(name)}" data-l="${esc(r && r[1] ? r[1] : '')}" style="margin-bottom:8px;width:100%;flex:none">${on ? '⭐ Línea en favoritas' : '☆ Añadir línea ' + esc(name) + ' a favoritas'}</button>`;
+    const tmp = document.createElement('div'); tmp.innerHTML = chip(fid, rid, name); const col = tmp.firstChild.style.background;
+    return `<button class="btn favline ${on ? 'on' : ''}" data-k="${esc(k)}" data-c="${esc(col)}" data-n="${esc(name)}" data-l="${esc(r && r[1] ? r[1] : '')}" style="margin-bottom:8px;width:100%;flex:none">${on ? '⭐ Línea en favoritas' : '☆ Añadir línea ' + esc(name) + ' a favoritas'}</button>`;
   };
   document.addEventListener('click', e => {
     const b = e.target.closest('.favline'); if (!b) return;
     const k = b.dataset.k, fid = k.split('|')[0];
     if (isFavLine(k)) FAVL = FAVL.filter(x => x.k !== k);
-    else FAVL.push({ k, feed: fid, name: b.dataset.n, long: b.dataset.l, color: (TT.route(fid, k.split('|')[1]) || [])[2] || feeds.get(fid)?.color });
-    saveFL(); renderFavLines(); renderDetail();
+    else FAVL.push({ k, feed: fid, name: b.dataset.n, long: b.dataset.l, color: b.dataset.c || feeds.get(fid)?.color });
+    saveFL(); renderFavLines(); renderActions(); renderDetail();
   });
   function renderFavLines() {
     let box = $('favlines');
@@ -269,6 +288,7 @@
     box.querySelectorAll('[data-del]').forEach(el => el.onclick = e => { e.stopPropagation(); FAVL = FAVL.filter(x => x.k !== el.dataset.del); if (!FAVL.length) onlyFav = false; saveFL(); renderFavLines(); });
   }
   renderFavLines();
+  renderActions();
 
   // ======================= INSTALAR COMO APP =======================
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

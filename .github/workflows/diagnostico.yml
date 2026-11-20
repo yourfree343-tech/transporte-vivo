@@ -32,6 +32,12 @@ jobs:
               errores: [...feeds.values()].filter(f => f.status && f.status.ok === false).map(f => f.id + ': ' + f.status.error),
             }))));
           }
+          console.log('AVISOS', JSON.stringify(await pg.evaluate(async () => {
+            const f = feeds.get('renfe-cercanias'); const al = await FeedsClient.alerts(f);
+            const rids = [...new Set(al.flatMap(a => a.routes))];
+            const ok = rids.filter(r => TT.route('renfe-cercanias', r));
+            return { avisos: al.length, codigosLinea: rids.length, encontradosEnHorario: ok.length, ejemplosNo: rids.filter(r => !TT.route('renfe-cercanias', r)).slice(0, 5), ejemploSi: ok.slice(0, 3).map(r => [r, TT.route('renfe-cercanias', r)]) };
+          })));
           await pg.tap('#q'); await pg.keyboard.type('Garena'); await pg.waitForTimeout(1500);
           console.log('BUSQUEDA', JSON.stringify(await pg.evaluate(() => document.getElementById('results').innerText.slice(0, 300))));
           await b.close();
