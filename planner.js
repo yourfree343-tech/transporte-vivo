@@ -169,7 +169,7 @@
     return { legs, dep: rides[0].dep - (legs[0].type === 'walk' ? legs[0].secs : 0), arr: endT, rides: rides.length };
   }
   async function alternatives(from, to) {
-    const out = []; let t = nowSec();
+    const out = []; let t = window.__plT0 ?? nowSec(); // __plT0 solo lo usan las pruebas automáticas
     for (let i = 0; i < 4; i++) {
       const it = await route(from, to, t); if (!it) break;
       const sig = it.legs.filter(l => l.type === 'ride').map(l => l.tid).join('>');
@@ -263,7 +263,7 @@
   const durTxt = s => { const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
   function chipOf(l) { const r = TT.route(l.fid, l.rid); return chip(l.fid, l.rid, (r && (r[0] || r[1])) || '·'); }
   function itCard(it, i) {
-    const now = nowSec(), leave = Math.round((it.dep - now) / 60);
+    const now = window.__plT0 ?? nowSec(), leave = Math.round((it.dep - now) / 60);
     const legs = it.legs.map(l => l.type === 'walk' ? `🚶 ${mins(l.secs)}'` : `${ICON[feeds.get(l.fid).type] || ''}${chipOf(l)}`).join(' <span>›</span> ');
     const late = it.legs.filter(l => l.type === 'ride' && l.delay > 60);
     return `<div class="it" data-i="${i}"><div class="top"><b>${fmtT(it.dep)} → ${fmtT(it.arr)}</b><span class="du">${durTxt(it.arr - it.dep)}</span></div>

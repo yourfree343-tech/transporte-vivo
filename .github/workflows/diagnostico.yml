@@ -41,10 +41,10 @@ jobs:
           })));
           await pg.tap('#q'); await pg.keyboard.press('Control+A').catch(()=>{}); await pg.fill('#q', ''); await pg.keyboard.type('Garena'); await pg.waitForTimeout(1500);
           console.log('BUSQUEDA', JSON.stringify(await pg.evaluate(() => document.getElementById('results').innerText.slice(0, 300))));
-          for (const [a, z] of [['La Garena', 'Aravaca'], ['Alcala de Henares', 'Sevilla Santa Justa'], ['Bilbao-Abando', 'Donostia']]) {
-            await pg.evaluate(([a, z]) => { Planner.setFrom(a); Planner.setTo(z); return 0; }, [a, z]);
+          for (const [a, z, h] of [['La Garena', 'Aravaca'], ['Alcala de Henares', 'Sevilla Santa Justa', 9], ['La Garena', 'Valencia Joaquin Sorolla', 9], ['Abando', 'Santander', 9]]) {
+            await pg.evaluate(([a, z, h]) => { window.__plT0 = h ? h * 3600 : undefined; Planner.setFrom(a); Planner.setTo(z); return 0; }, [a, z, h || 0]);
             await pg.waitForTimeout(20000);
-            console.log('TRAYECTO', a, '->', z, JSON.stringify(await pg.evaluate(() => document.getElementById('detail').innerText.slice(0, 600))));
+            console.log('TRAYECTO', a, '->', z, h ? '(a las ' + h + ':00)' : '(ahora)', JSON.stringify(await pg.evaluate(() => document.getElementById('detail').innerText.slice(0, 600))));
           }
           await pg.evaluate(() => { select(null); map.setView([40.4065, -3.6895], 12); return 0; }); await pg.waitForTimeout(3000);
           console.log('ESTACIONES EN PANTALLA', await pg.evaluate(() => (layer._st || []).length));
