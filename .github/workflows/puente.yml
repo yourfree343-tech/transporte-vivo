@@ -20,5 +20,23 @@ jobs:
             N=$(echo "$U" | md5sum | cut -c1-8); mkdir -p muestras
             curl -s -o muestras/$N.bin -m 20 -w "  puente : %{http_code} %{time_total}s %{size_download}B\n" "$B$E"; echo "$N $U" >> muestras/indice.txt
           done
-      - uses: actions/upload-artifact@v4
-        with: { name: muestras, path: muestras }
+      - uses: actions/checkout@v4
+        with: { path: repo }
+      - name: Leer las muestras con el decodificador de la web
+        run: |
+          cat > leer.js <<'JS'
+          const fs = require('fs');
+          global.window = {}; global.fetch = () => Promise.reject('x');
+          eval(fs.readFileSync('repo/feeds-client.js', 'utf8'));
+          for (const line of fs.readFileSync('muestras/indice.txt', 'utf8').trim().split('\n')) {
+            const [n, u] = line.split(' ');
+            const buf = fs.readFileSync('muestras/' + n + '.bin');
+            try {
+              if (u.endsWith('.json')) { const j = JSON.parse(buf); console.log('OK JSON', (j.entity || []).length, u); continue; }
+              const ents = window.FeedsClient.decodePB(buf);
+              const withPos = ents.filter(e => e.vehicle && e.vehicle.position);
+              console.log('OK', ents.length, 'entidades,', withPos.length, 'con posición', u, JSON.stringify(withPos[0] || ents[0] || {}).slice(0, 200));
+            } catch (e) { console.log('FALLA', u, e.message, 'bytes', buf.length, buf.slice(0, 16).toString('hex')); }
+          }
+          JS
+          node leer.js
