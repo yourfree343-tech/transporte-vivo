@@ -162,7 +162,8 @@
       <div id="nodata">No llegan datos ahora mismo. Puede que algún operador esté caído o bloquee el acceso. Se reintenta solo cada pocos segundos.</div>
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
-      <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a></div>
+      <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a>
+        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 1.7 · publicada __BUILD__<span id="verData"></span></div></div>
     </div>
     <div id="detail"></div>
   </div>
@@ -337,6 +338,7 @@ async function boot() {
   list.forEach(f => feeds.set(f.id, { ...f, on: !saved[f.id], status: { ok: null } }));
   renderFeeds();
   TT.init(list);
+  { const d = list.map(f => f.timetable && f.timetable.date).filter(Boolean).sort().pop(); if (d) document.getElementById('verData').textContent = ' · horarios del ' + d.split('-').reverse().join('/'); }
   FeedsClient.start(list,
     (id, data, via) => {
       trailUpdate(data); applyFeed(id, data);
