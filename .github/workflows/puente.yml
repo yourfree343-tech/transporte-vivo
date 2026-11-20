@@ -17,5 +17,8 @@ jobs:
             E=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$U")
             echo "== $U"
             curl -s -o /tmp/d -m 20 -w "  directo: %{http_code} %{time_total}s %{size_download}B\n" "$U"
-            curl -s -o /tmp/p -m 20 -w "  puente : %{http_code} %{time_total}s %{size_download}B\n" "$B$E"; head -c 120 /tmp/p | tr -dc '[:print:]'; echo
+            N=$(echo "$U" | md5sum | cut -c1-8); mkdir -p muestras
+            curl -s -o muestras/$N.bin -m 20 -w "  puente : %{http_code} %{time_total}s %{size_download}B\n" "$B$E"; echo "$N $U" >> muestras/indice.txt
           done
+      - uses: actions/upload-artifact@v4
+        with: { name: muestras, path: muestras }
