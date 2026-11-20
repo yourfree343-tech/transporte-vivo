@@ -98,6 +98,11 @@ def discover_fgc(feed):
     log(f"FGC: tiempo real {'sí' if feed.get('url') else 'no'} · horarios {'sí' if feed.get('gtfs') else 'no'}")
 
 # ---------- GTFS ----------
+def clean(x):
+    # nombres de Renfe con relleno interno: "Guadalajara        -Chamartín" -> "Guadalajara - Chamartín"
+    x = re.sub(r"\s{2,}-\s*", " - ", x or "")
+    return re.sub(r"\s+", " ", x).strip()
+
 def secs(t):
     try:
         h, m, s = t.strip().split(":"); return int(h) * 3600 + int(m) * 60 + int(s)
@@ -131,12 +136,12 @@ def build_feed(feed, outdir):
     routes = {}
     for r in read_csv(z, "routes.txt"):
         col = (r.get("route_color") or "").strip()
-        routes[r["route_id"]] = [r.get("route_short_name", "").strip(), r.get("route_long_name", "").strip(),
+        routes[r["route_id"]] = [clean(r.get("route_short_name", "")), clean(r.get("route_long_name", "")),
                                  ("#" + col) if re.fullmatch(r"[0-9A-Fa-f]{6}", col) else None, r.get("route_type", "")]
     trips = {}
     for r in read_csv(z, "trips.txt"):
         if r.get("service_id") in services:
-            trips[r["trip_id"]] = [r.get("route_id"), r.get("trip_headsign", "").strip(), r.get("trip_short_name", "").strip()]
+            trips[r["trip_id"]] = [r.get("route_id"), clean(r.get("trip_headsign", "")), r.get("trip_short_name", "").strip()]
     stoptimes = {}
     for r in read_csv(z, "stop_times.txt"):
         tid = r.get("trip_id")
@@ -150,7 +155,7 @@ def build_feed(feed, outdir):
     stops = {}
     for r in read_csv(z, "stops.txt"):
         if r["stop_id"] in used:
-            try: stops[r["stop_id"]] = [r.get("stop_name", "").strip(), round(float(r["stop_lat"]), 5), round(float(r["stop_lon"]), 5)]
+            try: stops[r["stop_id"]] = [clean(r.get("stop_name", "")), round(float(r["stop_lat"]), 5), round(float(r["stop_lon"]), 5)]
             except Exception: pass
     total = sum(len(v) for v in stoptimes.values())
     n = max(1, -(-total // 15000))

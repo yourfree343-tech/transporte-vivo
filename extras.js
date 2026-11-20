@@ -228,7 +228,8 @@
   // clave de línea: operador + id de línea del horario oficial (o, si el operador no publica horarios, la línea que da el tiempo real)
   const lineKey = (fid, rid, v) => {
     if (rid != null) {
-      const r = TT.route(fid, rid); if (!r) return null;
+      const r = TT.route(fid, rid);
+      if (!r) { const m = /^(\d{2})T\d{4}(.+)$/.exec(rid); return m ? `${fid}|${m[1]}|${m[2]}` : null; }
       const grp = /^\d{2}T/.test(rid) ? rid.slice(0, 2) : '';
       return `${fid}|${grp}|${r[0] || r[1]}`;
     }
