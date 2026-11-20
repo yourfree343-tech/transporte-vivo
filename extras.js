@@ -132,9 +132,7 @@
   // ======================= ACCIONES DE INICIO =======================
   function renderActions() {
     const n = visibleAlerts().length, mine = alertFav && hasFavs();
-    $('actions').innerHTML = `<button class="act" id="planBtn"><span>🧭</span><div>Cómo llegar<b>Trenes directos</b></div></button>` +
-      `<button class="act ${n ? 'warn' : ''}" id="alertBtn"><span>⚠️</span><div>Avisos<b>${n ? n + (mine ? ' en tus favoritas' : ' activos') : (mine ? 'Nada en tus favoritas' : 'Sin avisos')}</b></div></button>`;
-    $('planBtn').onclick = () => openPlanner();
+    $('actions').innerHTML = `<button class="act ${n ? 'warn' : ''}" id="alertBtn" style="grid-column:1/-1"><span>⚠️</span><div>Avisos<b>${n ? n + (mine ? ' en tus favoritas' : ' activos') : (mine ? 'Nada en tus favoritas' : 'Sin avisos')}</b></div></button>`;
     $('alertBtn').onclick = openAlerts;
   }
 
@@ -210,7 +208,7 @@
   HOOKS.stationExtra = (fid, sid) => {
     clearHi();
     const a = alertsFor(fid, null, sid).slice(0, 3).map(alertHTML).join('');
-    return a + `<div class="row"><button class="btn" id="goFrom">🧭 Salir desde aquí</button></div>`;
+    return a + `<div class="row"><button class="btn" id="goFrom">🟢 Salir desde aquí</button><button class="btn" id="goTo">🏁 Ir hasta aquí</button></div>`;
   };
   HOOKS.afterRender = d => {
     const fb = d.querySelector('#favBtn');
@@ -220,7 +218,10 @@
       saveFavs(); fb.classList.toggle('on', isFav(feed, stop)); fb.textContent = isFav(feed, stop) ? '⭐' : '☆'; renderFavs(); renderActions();
     };
     const gf = d.querySelector('#goFrom');
-    if (gf && selStation) gf.onclick = () => { const s = TT.stop(selStation.feed, selStation.stop); const e = stationIndex().get((s ? s[0] : '').toLowerCase()); openPlanner(e || null); };
+    const nm = () => { const s = selStation && TT.stop(selStation.feed, selStation.stop); return s ? s[0] : ''; };
+    if (gf && selStation) gf.onclick = () => window.Planner && Planner.setFrom(nm());
+    const gt = d.querySelector('#goTo');
+    if (gt && selStation) gt.onclick = () => window.Planner && Planner.setTo(nm());
   };
   HOOKS.home = () => { clearHi(); renderFavs(); };
 

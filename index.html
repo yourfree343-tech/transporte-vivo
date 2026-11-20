@@ -58,7 +58,7 @@
   .fab svg{width:20px;height:20px;stroke:var(--txt);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
   /* panel inferior (móvil) / lateral (ordenador) */
-  #sheet{position:fixed;z-index:1002;left:0;right:0;bottom:0;height:92dvh;background:var(--card);border-radius:22px 22px 0 0;box-shadow:0 -6px 30px rgba(15,23,42,.18);display:flex;flex-direction:column;transform:translateY(calc(100% - 190px));transition:transform .32s cubic-bezier(.2,.8,.2,1);will-change:transform}
+  #sheet{position:fixed;z-index:1002;left:0;right:0;bottom:0;height:92dvh;background:var(--card);border-radius:22px 22px 0 0;box-shadow:0 -6px 30px rgba(15,23,42,.18);display:flex;flex-direction:column;transform:translateY(calc(100% - 250px));transition:transform .32s cubic-bezier(.2,.8,.2,1);will-change:transform}
   #sheet.dragging{transition:none}
   #grab{flex:none;padding:10px 0 4px;cursor:grab;touch-action:none}
   #grab i{display:block;width:40px;height:5px;border-radius:9px;background:var(--dim);opacity:.35;margin:0 auto}
@@ -136,7 +136,7 @@
 <div id="top">
   <div id="search">
     <span id="logo">🚆</span>
-    <input id="q" type="search" enterkeyhint="search" placeholder="Buscar estación o tren" autocomplete="off">
+    <input id="q" type="search" enterkeyhint="search" placeholder="Buscar estación, línea o tren" autocomplete="off">
     <button id="clear" aria-label="Borrar">✕</button>
     <span class="live" id="live"><i></i>EN DIRECTO</span>
   </div>
@@ -163,7 +163,7 @@
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
       <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a>
-        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 2.0 · publicada __BUILD__<span id="verData"></span></div></div>
+        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 2.1 · publicada __BUILD__<span id="verData"></span></div></div>
     </div>
     <div id="detail"></div>
   </div>
@@ -374,7 +374,7 @@ function saveOff() { try { const o = {}; feeds.forEach((x, k) => { if (!x.on) o[
 const SHEET = (() => {
   const el = $('sheet'), grab = $('grab'), body = $('body');
   const desk = () => matchMedia('(min-width:900px)').matches;
-  const H = { peek: () => 190, half: () => Math.round(innerHeight * 0.5), full: () => Math.round(innerHeight * 0.92) };
+  const H = { peek: () => Math.min(250, Math.round(innerHeight * 0.34)), half: () => Math.round(innerHeight * 0.5), full: () => Math.round(innerHeight * 0.92) };
   const api = { state: 'peek' };
   const place = (px, anim = true) => { el.classList.toggle('dragging', !anim); el.style.transform = desk() ? '' : `translateY(${el.offsetHeight - px}px)`; };
   api.visible = () => desk() ? 0 : H[api.state]();
@@ -655,5 +655,6 @@ if (innerWidth < 600) map.setView([40.0, -3.7], 5);
 setInterval(renderFeeds, 5000);
 </script>
 <script src="extras.js"></script>
+<script src="planner.js"></script>
 </body>
 </html>
