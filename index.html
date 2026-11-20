@@ -163,7 +163,7 @@
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
       <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a>
-        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 1.7 · publicada __BUILD__<span id="verData"></span></div></div>
+        <div id="ver" style="margin-top:8px;font:600 12px var(--mono)">Versión 1.8 · publicada __BUILD__<span id="verData"></span></div></div>
     </div>
     <div id="detail"></div>
   </div>
@@ -225,23 +225,33 @@ const VehicleLayer = L.Layer.extend({
     ctx.clearRect(0, 0, s.x, s.y);
     const r = Math.max(3.5, Math.min(8, (z - 2.5) * 0.9));
     this._pts = []; this._st = [];
-    // estaciones / paradas
+    // estaciones / paradas, con nombres que no se pisan
     const b = m.getBounds().pad(0.1);
-    const drawn = new Set();
+    const drawn = new Set(), labels = [], boxes = [];
     for (const [fid, f] of feeds) {
       if (!f.on) continue; const md = TT.stopsOf(fid); if (!md || drawn.has(md)) continue; drawn.add(md);
       const rail = f.type !== 'bus';
-      if (z < (rail ? 10 : 14)) continue;
+      if (z < (rail ? 9 : 14)) continue;
       ctx.fillStyle = theme === 'dark' ? '#151925' : '#fff'; ctx.strokeStyle = f.color; ctx.lineWidth = 2;
-      const sz = rail ? (z >= 13 ? 5 : 3.5) : 3;
+      const sz = rail ? (z >= 13 ? 5 : z >= 11 ? 4 : 3) : 3;
       for (const sid in md.stops) {
         const s = md.stops[sid]; if (!b.contains([s[1], s[2]])) continue;
         const p = m.latLngToContainerPoint([s[1], s[2]]);
         this._st.push([p.x, p.y, fid, sid]);
         const isSel = selStation && selStation.stop === sid && selStation.feed === fid;
         ctx.beginPath(); ctx.arc(p.x, p.y, isSel ? sz + 3 : sz, 0, 7); ctx.fill(); ctx.stroke();
-        if (rail && z >= 13 || isSel) { ctx.font = '600 12px Space Grotesk, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = theme === 'dark' ? '#0b0d14' : '#fff'; ctx.strokeText(s[0], p.x + sz + 4, p.y - sz - 2); ctx.fillStyle = theme === 'dark' ? '#cfd3e0' : '#1e293b'; ctx.fillText(s[0], p.x + sz + 4, p.y - sz - 2); ctx.fillStyle = theme === 'dark' ? '#151925' : '#fff'; ctx.strokeStyle = f.color; ctx.lineWidth = 2; }
+        if (isSel || (rail && z >= 11) || (!rail && z >= 16)) labels.push([isSel ? 0 : (f.type === 'alta-velocidad' ? 1 : 2), s[0], p.x + sz + 4, p.y - sz - 2]);
       }
+    }
+    // primero la seleccionada y las de alta velocidad; se descartan las que chocan
+    labels.sort((a, b2) => a[0] - b2[0]);
+    ctx.font = '600 12px Space Grotesk, sans-serif'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    for (const [, name, x, y] of labels) {
+      const w = ctx.measureText(name).width, box = [x - 2, y - 12, x + w + 2, y + 3];
+      if (boxes.some(o => box[0] < o[2] && box[2] > o[0] && box[1] < o[3] && box[3] > o[1])) continue;
+      boxes.push(box);
+      ctx.strokeStyle = theme === 'dark' ? '#0b0d14' : '#fff'; ctx.strokeText(name, x, y);
+      ctx.fillStyle = theme === 'dark' ? '#cfd3e0' : '#1e293b'; ctx.fillText(name, x, y);
     }
     // estela del seleccionado
     if (selected && vehicles.has(selected)) {

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   try { host = new URL(target).hostname; } catch { return res.status(400).send('falta ?url='); }
   if (!ALLOWED.some(r => r.test(host))) return res.status(403).send('host no permitido');
   try {
-    const r = await fetch(target, { headers: { 'User-Agent': 'TransporteVivo/1.0' }, signal: AbortSignal.timeout(12000) });
+    const r = await fetch(target, { headers: { 'User-Agent': 'TransporteVivo/1.0' }, signal: AbortSignal.timeout(13000) });
     const buf = Buffer.from(await r.arrayBuffer());
     res.setHeader('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store, max-age=0');

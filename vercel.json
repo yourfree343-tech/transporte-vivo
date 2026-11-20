@@ -1,1 +1,1 @@
-{ "functions": { "api/proxy.js": { "maxDuration": 15 } } }
+{ "regions": ["cdg1"], "functions": { "api/proxy.js": { "maxDuration": 15 } } }
