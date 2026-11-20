@@ -23,7 +23,7 @@
   Reader.prototype.f32 = function () { const v = this.dv.getFloat32(this.p, true); this.p += 4; return v; };
   Reader.prototype.f64 = function () { const v = this.dv.getFloat64(this.p, true); this.p += 8; return v; };
   Reader.prototype.skip = function (wt) {
-    if (wt === 0) this.varint(); else if (wt === 1) this.p += 8; else if (wt === 2) this.p += this.varint(); else if (wt === 5) this.p += 4;
+    if (wt === 0) this.varint(); else if (wt === 1) this.p += 8; else if (wt === 2) { const n = this.varint(); this.p += n; } else if (wt === 5) this.p += 4;
     else throw new Error('tipo protobuf ' + wt);
   };
   const td = new TextDecoder();
