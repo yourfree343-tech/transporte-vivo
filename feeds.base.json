@@ -8,17 +8,28 @@
     "url": "https://gtfsrt.renfe.com/vehicle_positions.json",
     "tripUpdates": "https://gtfsrt.renfe.com/trip_updates.json",
     "gtfs": "https://ssl.renfe.com/ftransit/Fichero_CER_FOMENTO/fomento_transit.zip",
-    "interval": 20
+    "interval": 20,
+    "alerts": "https://gtfsrt.renfe.com/alerts.json"
   },
   {
     "id": "renfe-ld",
     "name": "Renfe AV / Larga y Media Distancia",
     "type": "alta-velocidad",
     "color": "#7c3aed",
-    "format": "none",
+    "format": "json",
     "gtfs": "https://ssl.renfe.com/gtransit/Fichero_AV_LD/google_transit.zip",
     "interval": 30,
-    "note": "Renfe no publica posiciones abiertas de AV/LD: solo horarios y salidas por estación"
+    "url": "https://gtfsrt.renfe.com/vehicle_positions_LD.json",
+    "tripUpdates": "https://gtfsrt.renfe.com/trip_updates_LD.json"
+  },
+  {
+    "id": "fgc",
+    "name": "FGC (Ferrocarrils Generalitat)",
+    "type": "tren",
+    "color": "#f97316",
+    "format": "pb",
+    "discover": "fgc",
+    "interval": 30
   },
   {
     "id": "metro-bilbao",

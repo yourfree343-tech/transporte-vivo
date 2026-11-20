@@ -1,7 +1,7 @@
 // Intermediario propio para Transporte Vivo (Vercel, plan gratuito).
 // Lee los feeds de los operadores desde el servidor y los devuelve con permiso CORS.
 const ALLOWED = [/(^|\.)renfe\.com$/, /(^|\.)euskadi\.eus$/, /\.amazonaws\.com$/, /(^|\.)emtmalaga\.es$/,
-  /(^|\.)optibus\.co$/, /\.supabase\.co$/, /(^|\.)bilbao\.eus$/, /(^|\.)ctb\.eus$/];
+  /(^|\.)optibus\.co$/, /\.supabase\.co$/, /(^|\.)bilbao\.eus$/, /(^|\.)ctb\.eus$/, /(^|\.)fgc\.cat$/, /(^|\.)opendatasoft\.com$/];
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

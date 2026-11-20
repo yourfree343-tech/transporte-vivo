@@ -80,6 +80,23 @@ def discover_euskadi(existing_urls, base_feeds):
     log(f"Euskadi: {len(found)} feeds nuevos")
     return found
 
+# ---------- descubrimiento: FGC (Opendatasoft) ----------
+FGC = "https://dadesobertes.fgc.cat/api/explore/v2.1/catalog/datasets/"
+def ods_files(dataset):
+    urls = []
+    for path in ("/attachments", "/records?limit=20", "/exports/json?limit=20"):
+        try: urls += walk_urls(json.loads(get(FGC + dataset + path, 60)), [])
+        except Exception as e: log(f"FGC {dataset}{path}: {e}")
+    return urls
+
+def discover_fgc(feed):
+    urls = ods_files("vehicle-positions-gtfs_realtime")
+    pb = [u for u in urls if re.search(r"(\.pb|/files/|download)", u, re.I)]
+    if pb: feed["url"] = pb[0]
+    g = [u for u in ods_files("gtfs") + ods_files("google_transit") if u.lower().endswith(".zip") or "/files/" in u]
+    if g and not feed.get("gtfs"): feed["gtfs"] = g[0]
+    log(f"FGC: tiempo real {'sí' if feed.get('url') else 'no'} · horarios {'sí' if feed.get('gtfs') else 'no'}")
+
 # ---------- GTFS ----------
 def secs(t):
     try:
@@ -150,12 +167,42 @@ def build_feed(feed, outdir):
     for d in ssh:
         for v in d.values(): v.sort()
     base = os.path.join(outdir, "data", feed["id"])
-    os.makedirs(os.path.join(base, "t"), exist_ok=True); os.makedirs(os.path.join(base, "s"), exist_ok=True)
+    os.makedirs(os.path.join(base, "t"), exist_ok=True)
+    os.makedirs(base, exist_ok=True); os.makedirs(os.path.join(base, "s"), exist_ok=True)
     used_routes = {k: v for k, v in routes.items() if any(t[0] == k for t in trips.values())}
+    # trazado de cada línea: el viaje con más paradas, con su shape si existe
+    best = {}
+    for tid, lst in stoptimes.items():
+        rid = trips[tid][0]
+        if rid not in best or len(lst) > len(stoptimes[best[rid]]): best[rid] = tid
+    shape_of = {}
+    if best:
+        want = set(best.values())
+        for r in read_csv(z, "trips.txt"):
+            if r.get("trip_id") in want and r.get("shape_id"): shape_of[r["trip_id"]] = r["shape_id"]
+    shapes = {}
+    if shape_of:
+        need = set(shape_of.values())
+        for r in read_csv(z, "shapes.txt"):
+            sid = r.get("shape_id")
+            if sid in need:
+                try: shapes.setdefault(sid, []).append((int(float(r.get("shape_pt_sequence") or 0)), float(r["shape_pt_lat"]), float(r["shape_pt_lon"])))
+                except Exception: pass
+    lines = {}
+    for rid, tid in best.items():
+        pts = None
+        sh = shapes.get(shape_of.get(tid))
+        if sh and len(sh) > 1:
+            sh.sort(); step = max(1, len(sh) // 200); pts = [[round(a, 5), round(b, 5)] for _, a, b in sh[::step]] + [[round(sh[-1][1], 5), round(sh[-1][2], 5)]]
+        else:
+            pts = [stops[sid][1:] for _, sid, _ in stoptimes[tid] if sid in stops]
+        if len(pts) > 1: lines[rid] = pts
+    os.makedirs(os.path.join(outdir, "data", feed["id"]), exist_ok=True)
+    dump(os.path.join(outdir, "data", feed["id"], "lines.json"), lines)
     dump(os.path.join(base, "meta.json"), {"date": today.isoformat(), "buckets": n, "routes": used_routes, "stops": stops})
     for i in range(n):
         dump(os.path.join(base, "t", f"{i}.json"), tsh[i]); dump(os.path.join(base, "s", f"{i}.json"), ssh[i])
-    return {"date": today.isoformat(), "trips": len(stoptimes), "stops": len(stops), "buckets": n}
+    return {"date": today.isoformat(), "trips": len(stoptimes), "stops": len(stops), "buckets": n, "lines": len(lines)}
 
 def dump(path, obj):
     with open(path, "w", encoding="utf-8") as f: json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
@@ -163,6 +210,10 @@ def dump(path, obj):
 def main():
     base = json.load(open(os.path.join(ROOT, "feeds.base.json"), encoding="utf-8"))
     feeds = [f for f in base if f.get("enabled", True)]
+    for f in feeds:
+        if f.get("discover") == "fgc":
+            try: discover_fgc(f)
+            except Exception as e: log("FGC:", e)
     feeds += discover_euskadi({f.get("url") for f in feeds}, feeds)
     os.makedirs(OUT, exist_ok=True)
     for f in feeds:
@@ -177,7 +228,8 @@ def main():
         src = by_id.get(f.get("shareTimetable") or "")
         if src and src.get("timetable"): f["timetable"] = dict(src["timetable"], source=src["id"])
         f.pop("shareTimetable", None)
-    for f in feeds: f.pop("gtfs", None)
+    for f in feeds: f.pop("gtfs", None); f.pop("discover", None)
+    feeds = [f for f in feeds if f.get("url") or f.get("timetable")]
     dump(os.path.join(OUT, "feeds.json"), feeds)
     log(f"feeds.json con {len(feeds)} operadores")
 

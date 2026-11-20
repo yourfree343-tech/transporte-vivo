@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Transporte Vivo · España en tiempo real</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0ea56b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Transporte Vivo">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet.css">
@@ -144,6 +152,10 @@
   <div id="body">
     <div id="home">
       <div id="hero"><div id="total">0<small>vehículos en directo</small></div><svg id="spark" viewBox="0 0 300 36" preserveAspectRatio="none"></svg></div>
+      <div id="install"></div>
+      <div id="actions"></div>
+      <div id="favs"></div>
+      <div class="sect">Mostrar en el mapa</div>
       <div id="types"></div>
       <div id="nodata">No llegan datos ahora mismo. Puede que algún operador esté caído o bloquee el acceso. <a href="#demo" onclick="setTimeout(()=>location.reload(),50)">Ver demo</a></div>
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
@@ -365,6 +377,8 @@ boot();
 
 // ---------- interfaz ----------
 const $ = id => document.getElementById(id);
+const HOOKS = {};
+function hook(name, ...a) { try { return HOOKS[name] ? HOOKS[name](...a) || '' : ''; } catch (e) { console.error(e); return ''; } }
 const TYPES = [['alta-velocidad', '🚄', 'AVE y Larga Dist.'], ['tren', '🚆', 'Trenes'], ['metro', '🚇', 'Metro'], ['tranvia', '🚊', 'Tranvía'], ['bus', '🚌', 'Bus'], ['ferry', '⛴️', 'Ferry']];
 function countFor(id) { let n = 0; for (const v of vehicles.values()) if (v.feed === id) n++; return n; }
 function saveOff() { try { const o = {}; feeds.forEach((x, k) => { if (!x.on) o[k] = 1; }); localStorage.setItem('tv-off', JSON.stringify(o)); } catch {} }
@@ -460,10 +474,10 @@ function ago(t) { const s = Math.round((Date.now() - t) / 1000); return s < 60 ?
 
 function showHome(on) { $('home').style.display = on ? 'block' : 'none'; $('detail').style.display = on ? 'none' : 'block'; }
 function select(id) {
-  const was = !!(selected || selStation);
+  const was = !!(selected || selStation) || $('detail').style.display === 'block';
   selected = id; follow = false; selStation = null; $('detail')._scrolled = false;
   if (id) { showHome(false); $('body').scrollTop = 0; if (SHEET.state === 'peek') SHEET.set('half'); }
-  else { showHome(true); if (was) SHEET.set('peek'); }
+  else { showHome(true); if (was) SHEET.set('peek'); hook('home'); }
   renderDetail();
 }
 function fmtT(sec) { sec = ((sec % 86400) + 86400) % 86400; return String(Math.floor(sec / 3600)).padStart(2, '0') + ':' + String(Math.floor(sec % 3600 / 60)).padStart(2, '0'); }
@@ -489,6 +503,7 @@ async function renderDetail() {
   const dest = trip && trip.rec[1] ? trip.rec[1] : (r && r[1]) || v.label;
   let html = `<div class="dh"><h2>${chip(v.feed, rid, v.route || v.label)} ${trip && trip.rec[1] ? '→ ' : ''}${dest}</h2><button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div>
     <div class="sub">${ICON[f.type] || ''} ${f.name}${r && r[1] && trip && trip.rec[1] ? ' · ' + r[1] : ''}</div>
+    ${hook('vehicleExtra', v.feed, rid, v)}
     <div class="stats">
       <div class="stat"><small>Estado</small><b>${tu ? delayTxt(tu.delay) : '—'}</b></div>
       <div class="stat"><small>Velocidad</small><b>${kmh}</b></div>
@@ -504,7 +519,7 @@ async function renderDetail() {
       return `<li class="${i < nextIdx ? 'past' : i === nextIdx ? 'next' : ''}" data-stop="${sid}"><span>${TT.stopName(v.feed, sid)}</span><span class="tm">${tm}</span></li>`;
     }).join('') + `</ul>`;
   } else html += `<p class="muted" style="margin-top:14px">${f.timetable ? 'No encuentro este viaje en los horarios de hoy.' : 'Este operador no publica horarios abiertos, solo la posición.'}</p>`;
-  const body = $('body'), keep = body.scrollTop; showHome(false); d.innerHTML = html; body.scrollTop = keep;
+  const body = $('body'), keep = body.scrollTop; showHome(false); d.innerHTML = html; body.scrollTop = keep; hook('afterRender', d);
   $('followBtn').onclick = () => { follow = !follow; if (follow) { map.setZoom(Math.max(map.getZoom(), 14)); SHEET.set('peek'); } renderDetail(); };
   $('closeBtn').onclick = () => select(null);
   d.querySelectorAll('[data-stop]').forEach(li => li.onclick = () => selectStation(v.feed, li.dataset.stop, true));
@@ -514,9 +529,9 @@ async function renderDetail() {
 async function renderStation(token) {
   const d = $('detail'), { feed: fid, stop: sid } = selStation, f = feeds.get(fid);
   const s = TT.stop(fid, sid);
-  const head = `<div class="dh"><h2>🚉 ${s ? s[0] : sid}</h2><button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div><div class="sub">${ICON[f.type] || ''} ${f.name}</div>`;
+  const head = `<div class="dh"><h2>🚉 ${s ? s[0] : sid}</h2>${hook('stationHead', fid, sid)}<button class="x" id="closeBtn" aria-label="Cerrar">✕</button></div><div class="sub">${ICON[f.type] || ''} ${f.name}</div>${hook('stationExtra', fid, sid)}`;
   showHome(false);
-  if (!d.dataset.st || d.dataset.st !== fid + sid) { d.innerHTML = head + `<p class="muted">Cargando horarios…</p>`; d.dataset.st = fid + sid; $('closeBtn').onclick = () => select(null); }
+  if (!d.dataset.st || d.dataset.st !== fid + sid) { d.innerHTML = head + `<p class="muted">Cargando horarios…</p>`; d.dataset.st = fid + sid; $('closeBtn').onclick = () => select(null); hook('afterRender', d); }
   const deps = await TT.departures(fid, sid);
   if (token !== detailToken) return;
   const now = nowSec();
@@ -528,7 +543,7 @@ async function renderStation(token) {
     (list.length ? list.map(x => `<div class="dep" data-trip="${x.tid}"><span class="tm">${fmtT(x.t)}</span>${chip(fid, x.rid)}<span class="hd">${x.hd || ''}</span>${x.d != null ? delayTxt(x.d) : ''}${live.has(x.tid) ? '<span class="live-dot" title="Está en el mapa"></span>' : ''}</div>`).join('')
       : `<p class="muted">${f.timetable ? 'No quedan salidas hoy.' : 'Este operador no publica horarios.'}</p>`) +
     (list.some(x => live.has(x.tid)) ? `<p class="muted" style="margin-top:10px"><span class="live-dot" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Toca una salida con punto verde para ver el tren en el mapa.</p>` : '');
-  body.scrollTop = keep;
+  body.scrollTop = keep; hook('afterRender', d);
   $('closeBtn').onclick = () => select(null);
   d.querySelectorAll('[data-trip]').forEach(el => el.onclick = () => { const vid = live.get(el.dataset.trip); if (vid) { select(vid); flyVisible(vehicles.get(vid).cur, 14); } });
 }
@@ -594,7 +609,7 @@ function doSearch() {
   hi = 0; drawHits();
 }
 q.addEventListener('input', doSearch);
-q.addEventListener('focus', () => { if (q.value) doSearch(); });
+q.addEventListener('focus', () => { setTimeout(() => q.select(), 0); if (q.value) doSearch(); });
 function drawHits() {
   results.style.display = 'block';
   results.innerHTML = hits.length ? hits.map((v, i) => { const f = feeds.get(v.feed);
@@ -602,7 +617,7 @@ function drawHits() {
     return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.route, v.route || '·')} <span>${v.label}</span><span class="r-sub">${f.name}</span></div>`; }).join('')
     : `<div class="muted">Sin resultados</div>`;
 }
-function go(v) { results.style.display = 'none'; q.blur(); if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
+function go(v) { results.style.display = 'none'; q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
 results.addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) go(hits[+el.dataset.i]); });
 q.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, hits.length - 1); drawHits(); e.preventDefault(); }
@@ -636,5 +651,6 @@ $('locate').onclick = () => {
 if (innerWidth < 600) map.setView([40.0, -3.7], 5);
 setInterval(renderFeeds, 5000);
 </script>
+<script src="extras.js"></script>
 </body>
 </html>

@@ -124,8 +124,22 @@
     return out;
   }
 
+  async function alerts(feed) {
+    const r = await getVia(feed, feed.alerts);
+    const j = await r.json();
+    const tx = t => { const tr = (t && t.translation) || []; const es = tr.find(x => (x.language || '').startsWith('es')) || tr[0]; return es ? es.text : ''; };
+    const seen = new Set(), out = [];
+    for (const e of j.entity || []) {
+      const a = e.alert; if (!a || seen.has(e.id)) continue; seen.add(e.id);
+      const ie = a.informedEntity || a.informed_entity || [];
+      out.push({ id: e.id, head: tx(a.headerText || a.header_text), text: tx(a.descriptionText || a.description_text),
+        routes: ie.map(x => x.routeId || x.route_id).filter(Boolean), stops: ie.map(x => x.stopId || x.stop_id).filter(Boolean) });
+    }
+    return out;
+  }
+
   window.FeedsClient = {
-    tripUpdates,
+    tripUpdates, alerts,
     start(feeds, onData, onError) {
       feeds.filter(f => f.url).forEach((f, k) => {
         const tick = async () => {

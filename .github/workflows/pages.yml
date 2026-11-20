@@ -22,7 +22,7 @@ jobs:
       - name: Copiar la web
         run: |
           mkdir _site
-          cp -r index.html feeds-client.js feeds.base.json vendor .nojekyll _site/
+          cp -r index.html feeds-client.js extras.js sw.js manifest.webmanifest icons feeds.base.json vendor .nojekyll _site/
       - name: Generar horarios del día
         run: python3 tools/build_data.py _site
       - uses: actions/upload-pages-artifact@v3
