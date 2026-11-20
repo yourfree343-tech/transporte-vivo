@@ -2,12 +2,15 @@
 (function () {
   // directo primero; si el operador bloquea el navegador (CORS), proxies gratuitos sin clave.
   // Se puede añadir uno propio (p. ej. un Cloudflare Worker) en config.json → "proxy": "https://…/?url="
+  // 1º nuestro puente propio en Vercel (api/proxy.js de este repositorio), luego directo y proxies públicos de respaldo
+  const BRIDGE = 'https://transporte-vivo.vercel.app/api/proxy?url=';
   const PROXIES = [
+    u => BRIDGE + encodeURIComponent(u),
     u => u,
     u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
     u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   ];
-  fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => { if (c && c.proxy) PROXIES.splice(1, 0, u => c.proxy + encodeURIComponent(u)); }).catch(() => {});
+  fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => { if (c && c.proxy) PROXIES.splice(0, 0, u => c.proxy + encodeURIComponent(u)); }).catch(() => {});
 
   // ---------- decodificador protobuf mínimo para VehiclePosition ----------
   function Reader(buf) { this.b = buf; this.p = 0; this.dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength); }
@@ -124,7 +127,7 @@
   window.FeedsClient = {
     tripUpdates,
     start(feeds, onData, onError) {
-      feeds.forEach((f, k) => {
+      feeds.filter(f => f.url).forEach((f, k) => {
         const tick = async () => {
           try { const r = await fetchFeed(f); onData(f.id, r.list, r.via); }
           catch (e) { onError(f.id, e.name === 'TimeoutError' ? 'tiempo agotado' : (e.message || 'error de red')); }

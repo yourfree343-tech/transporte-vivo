@@ -434,7 +434,7 @@ function renderFeeds() {
     row.classList.toggle('on', f.on);
     row.querySelector('.ct').textContent = countFor(f.id) || '';
     em.className = st.ok === false ? 'err' : '';
-    em.textContent = st.ok === false ? st.error : st.last ? `actualizado ${ago(st.last)}` : f.on ? 'conectando…' : 'oculto';
+    em.textContent = !f.url ? 'solo horarios (toca una estación)' : st.ok === false ? st.error : st.last ? `actualizado ${ago(st.last)}` : f.on ? 'conectando…' : 'oculto';
   }
 }
 $('feeds').addEventListener('click', e => {
