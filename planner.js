@@ -179,7 +179,9 @@
     }
     // fuera las opciones peores: otra sale igual o más tarde, llega igual o antes y con no más transbordos
     const good = out.filter(a => !out.some(b => b !== a && b.dep >= a.dep && b.arr <= a.arr && b.rides <= a.rides && (b.dep > a.dep || b.arr < a.arr || b.rides < a.rides)));
-    return good.sort((a, b) => a.dep - b.dep).slice(0, 5);
+    // y las que tardan muchísimo más que la mejor (p. ej. 8 h cuando hay una de 3 h)
+    const minDur = Math.min(...good.map(x => x.arr - x.dep));
+    return good.filter(x => x.arr - x.dep <= minDur * 1.8 + 1800).sort((a, b) => a.dep - b.dep).slice(0, 5);
   }
 
   // ---------- interfaz ----------
