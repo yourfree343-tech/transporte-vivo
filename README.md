@@ -34,6 +34,5 @@ Para añadir otro operador, edita `feeds.base.json`. El campo `gtfs` es opcional
 ## Cómo funciona
 - La web es estática y se aloja en GitHub Pages. El navegador lee directamente los feeds GTFS-Realtime de cada operador, en JSON o protobuf. Como los operadores no dejan leer sus datos desde otra web (CORS), la web los pide a través de un puente propio en Vercel (`api/proxy.js`, https://transporte-vivo.vercel.app).
 - Cada noche, la tarea `.github/workflows/pages.yml` ejecuta `tools/build_data.py`. Este programa descarga los horarios oficiales (GTFS) de cada operador, se queda solo con los viajes del día y los guarda en `data/` en pequeños fragmentos JSON.
-- Si añades `#demo` al final de la dirección, verás vehículos simulados.
 
 Los datos son de Renfe, del Gobierno Vasco (Open Data Euskadi), del CTB y del resto de operadores, todos con licencia abierta. El mapa es © OpenStreetMap y © CARTO.

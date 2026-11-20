@@ -33,7 +33,7 @@
   .leaflet-control-zoom a{background:var(--card)!important;color:var(--txt)!important;border-color:var(--line)!important;width:40px!important;height:40px!important;line-height:40px!important}
 
   /* barra de búsqueda */
-  #top{position:fixed;z-index:1001;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;max-width:520px}
+  #top{position:fixed;z-index:1010;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;max-width:520px}
   #search{display:flex;align-items:center;gap:10px;height:52px;padding:0 8px 0 16px;background:var(--card);border-radius:26px;box-shadow:var(--shadow)}
   #logo{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,#0ea56b,#0891b2);display:grid;place-items:center;color:#fff;font-size:15px;flex:none}
   #search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--txt);font:16px var(--font)}
@@ -44,6 +44,8 @@
   .live i{width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 1.6s infinite}
   .live.demo{color:#b45309;background:rgba(245,158,11,.15)}
   @keyframes blink{50%{opacity:.25}}
+  body.searching #sheet{transform:translateY(105%)!important} body.searching #fabs{display:none}
+  body.searching #results{max-height:calc(100dvh - 100px)}
   #results{display:none;margin-top:8px;background:var(--card);border-radius:18px;box-shadow:var(--shadow);max-height:55vh;overflow:auto;padding:6px}
   #results div{padding:12px;border-radius:12px;cursor:pointer;display:flex;gap:10px;align-items:center;font-size:15px}
   #results div.sel,#results div:active{background:var(--card2)}
@@ -157,7 +159,7 @@
       <div id="favs"></div>
       <div class="sect">Mostrar en el mapa</div>
       <div id="types"></div>
-      <div id="nodata">No llegan datos ahora mismo. Puede que algún operador esté caído o bloquee el acceso. <a href="#demo" onclick="setTimeout(()=>location.reload(),50)">Ver demo</a></div>
+      <div id="nodata">No llegan datos ahora mismo. Puede que algún operador esté caído o bloquee el acceso. Se reintenta solo cada pocos segundos.</div>
       <div class="sect">Operadores <button id="allBtn">Todos</button></div>
       <div id="feeds"></div>
       <div id="foot">Toca un vehículo o una estación para ver horarios y retrasos. Datos abiertos de Renfe, Open Data Euskadi, CTB y cada operador. Mapa © OpenStreetMap. <a href="https://github.com/yourfree343-tech/transporte-vivo">Código</a></div>
@@ -317,7 +319,6 @@ function applyFeed(feedId, list) {
   list.forEach(upsert);
 }
 // ---------- feeds en el navegador ----------
-let demoMode = false;
 function setBadge(t, demo) { const l = document.getElementById('live'); l.classList.toggle('demo', demo); l.lastChild.textContent = t; }
 function trailUpdate(list) {
   for (const n of list) {
@@ -335,43 +336,16 @@ async function boot() {
   list.forEach(f => feeds.set(f.id, { ...f, on: !saved[f.id], status: { ok: null } }));
   renderFeeds();
   TT.init(list);
-  if (location.hash === '#demo') return startDemo(list);
   FeedsClient.start(list,
     (id, data, via) => {
-      if (demoMode) return;
       trailUpdate(data); applyFeed(id, data);
       feeds.get(id).status = { ok: true, last: Date.now(), via };
       document.getElementById('nodata').style.display = 'none';
       setBadge('EN DIRECTO', false); renderFeeds(); renderTotal(); if (selected) renderDetail();
     },
-    (id, err) => { if (demoMode) return; feeds.get(id).status = { ok: false, error: err, last: Date.now() }; renderFeeds(); });
+    (id, err) => { feeds.get(id).status = { ok: false, error: err, last: Date.now() }; renderFeeds(); });
   // si en 25 s no llega nada de ningún operador, ofrecer la demo
-  setTimeout(() => { if (!vehicles.size && !demoMode) document.getElementById('nodata').style.display = 'block'; }, 25000);
-}
-function startDemo(list) {
-  demoMode = true; vehicles.clear(); setBadge('DEMO', true);
-  document.getElementById('nodata').style.display = 'none';
-  const C = {
-    'renfe-ld': [[40.4065,-3.6895],[41.6488,-0.8891],[41.379,2.14],[40.4065,-3.6895],[37.391,-5.975],[40.4065,-3.6895],[39.466,-0.377],[40.4065,-3.6895],[43.263,-2.935]],
-    'renfe-cercanias': [[40.4065,-3.6895],[40.453,-3.692],[40.548,-3.642],[40.4065,-3.6895],[40.326,-3.766],[41.379,2.14],[41.45,2.247],[41.379,2.14],[41.32,2.09]],
-    'emt-malaga': [[36.7213,-4.4214],[36.718,-4.439],[36.729,-4.425],[36.709,-4.444]],
-    'metro-bilbao': [[43.263,-2.935],[43.325,-3.01],[43.256,-2.923],[43.29,-2.99]],
-  };
-  const sims = [];
-  list.forEach(f => { const pts = C[f.id]; if (!pts) return; const n = f.type === 'alta-velocidad' ? 14 : 22;
-    for (let i = 0; i < n; i++) sims.push({ f, pts, i, t: Math.random() * (pts.length - 1), sp: (f.type === 'alta-velocidad' ? .004 : .01) * (.5 + Math.random()), line: f.type === 'tren' ? 'C' + (1 + i % 10) : f.type === 'bus' ? String(1 + i % 40) : 'L' + (1 + i % 3) }); });
-  const tick = () => {
-    const by = {};
-    for (const s of sims) {
-      s.t = (s.t + s.sp) % (s.pts.length - 1);
-      const k = Math.floor(s.t), r = s.t - k, a = s.pts[k], b = s.pts[k + 1];
-      (by[s.f.id] = by[s.f.id] || []).push({ id: s.f.id + ':d' + s.i, feed: s.f.id, lat: a[0] + (b[0] - a[0]) * r + Math.sin(s.i) * .002, lon: a[1] + (b[1] - a[1]) * r + Math.cos(s.i) * .002,
-        bearing: (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI + 360) % 360, speed: s.f.type === 'alta-velocidad' ? 70 : 15, label: s.line + '-' + (1000 + s.i), route: s.line, trip: 'demo-' + s.i, ts: Date.now() });
-    }
-    for (const id in by) { trailUpdate(by[id]); applyFeed(id, by[id]); feeds.get(id).status = { ok: true, last: Date.now(), via: 'demo' }; }
-    renderFeeds(); renderTotal(); if (selected) renderDetail();
-  };
-  tick(); setInterval(tick, 5000);
+  setTimeout(() => { if (!vehicles.size) document.getElementById('nodata').style.display = 'block'; }, 25000);
 }
 boot();
 
@@ -597,27 +571,34 @@ function crc32(str) { const b = new TextEncoder().encode(str); let c = 0xFFFFFFF
 
 // búsqueda
 const q = $('q'), results = $('results'); let hits = [], hi = 0;
+const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 function doSearch() {
-  const s = q.value.trim().toLowerCase(); $('clear').style.display = s ? 'block' : 'none';
-  if (!s) { results.style.display = 'none'; return; }
+  const raw = q.value.trim(); $('clear').style.display = raw ? 'block' : 'none';
+  if (!raw) { results.style.display = 'none'; return; }
+  const words = fold(raw).split(/\s+/).filter(Boolean);
+  const match = txt => { const t = fold(txt); return words.every(w => t.includes(w)); };
   hits = [];
-  const seenMd = new Set(), seenName = new Set();
-  for (const [fid, f] of feeds) { const md = TT.stopsOf(fid); if (!md || !f.on || seenMd.has(md)) continue; seenMd.add(md);
-    for (const sid in md.stops) { if (hits.length >= 15) break; const nm = md.stops[sid][0];
-      if (nm.toLowerCase().includes(s) && !seenName.has(fid + nm)) { seenName.add(fid + nm); hits.push({ station: true, feed: fid, sid, name: nm }); } } }
-  hits.push(...[...vehicles.values()].filter(v => feeds.get(v.feed)?.on && `${v.route} ${v.label} ${v.trip}`.toLowerCase().includes(s)).slice(0, 15));
-  hi = 0; drawHits();
+  const seenMd = new Set(), seenName = new Set(), st = [];
+  for (const [fid] of feeds) { const md = TT.stopsOf(fid); if (!md || seenMd.has(md)) continue; seenMd.add(md);
+    for (const sid in md.stops) { const nm = md.stops[sid][0];
+      if (match(nm) && !seenName.has(fid + nm)) { seenName.add(fid + nm); st.push({ station: true, feed: fid, sid, name: nm, score: fold(nm).indexOf(words[0]) }); } } }
+  st.sort((x, y) => (x.score - y.score) || x.name.length - y.name.length);
+  hits.push(...st.slice(0, 25));
+  hits.push(...[...vehicles.values()].filter(v => match(`${v.route} ${v.label} ${v.trip}`)).slice(0, 15));
+  hi = 0; drawHits(seenMd.size === 0);
 }
 q.addEventListener('input', doSearch);
-q.addEventListener('focus', () => { setTimeout(() => q.select(), 0); if (q.value) doSearch(); });
-function drawHits() {
+q.addEventListener('focus', () => { document.body.classList.add('searching'); setTimeout(() => q.select(), 0); if (q.value) doSearch(); });
+q.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== q) document.body.classList.remove('searching'); }, 250));
+function drawHits(loading) {
   results.style.display = 'block';
   results.innerHTML = hits.length ? hits.map((v, i) => { const f = feeds.get(v.feed);
     if (v.station) return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">🚉 <b>${v.name}</b><span class="r-sub">${f.name}</span></div>`;
     return `<div class="${i === hi ? 'sel' : ''}" data-i="${i}">${ICON[f.type] || ''} ${chip(v.feed, v.route, v.route || '·')} <span>${v.label}</span><span class="r-sub">${f.name}</span></div>`; }).join('')
-    : `<div class="muted">Sin resultados</div>`;
+    : `<div class="muted">${loading ? 'Cargando estaciones… prueba en unos segundos' : 'Sin resultados'}</div>`;
 }
-function go(v) { results.style.display = 'none'; q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
+function go(v) { results.style.display = 'none'; document.body.classList.remove('searching'); q.blur(); q.value = ''; $('clear').style.display = 'none'; if (!v) return; if (v.station) return selectStation(v.feed, v.sid, true); select(v.id); flyVisible(v.cur || [v.lat, v.lon], 14, 1.4); }
+results.addEventListener('pointerdown', e => e.preventDefault());
 results.addEventListener('click', e => { const el = e.target.closest('[data-i]'); if (el) go(hits[+el.dataset.i]); });
 q.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown') { hi = Math.min(hi + 1, hits.length - 1); drawHits(); e.preventDefault(); }
@@ -626,7 +607,7 @@ q.addEventListener('keydown', e => {
   else if (e.key === 'Escape') { q.value = ''; doSearch(); q.blur(); }
 });
 $('clear').onclick = () => { q.value = ''; doSearch(); q.focus(); };
-map.on('click movestart', () => { if (results.style.display === 'block') { results.style.display = 'none'; q.blur(); } });
+map.on('click movestart', () => { if (results.style.display === 'block' || document.body.classList.contains('searching')) { results.style.display = 'none'; document.body.classList.remove('searching'); q.blur(); } });
 document.addEventListener('keydown', e => {
   if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); q.select(); }
   if (e.key === 'Escape' && document.activeElement !== q) select(null);
